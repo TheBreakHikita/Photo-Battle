@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Админка Батла</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f4f9; padding: 20px; max-width: 600px; margin: auto; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        input, button { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }
+        button { background: #ff4757; color: white; border: none; font-weight: bold; cursor: pointer; }
+        label { font-weight: bold; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>⚙️ Управление Батлом</h2>
+        
+        <label>Ссылка на Фото 1:</label>
+        <input type="text" id="photo1">
+
+        <label>Ссылка на Фото 2:</label>
+        <input type="text" id="photo2">
+
+        <label>Ссылка на пост с голосованием:</label>
+        <input type="text" id="postLink">
+
+        <label>Конец батла (Дата и время):</label>
+        <input type="datetime-local" id="timer">
+
+        <label>Победители (имена через запятую, например: Игрок 1, Игрок 4):</label>
+        <input type="text" id="winners">
+
+        <hr>
+        <label>Пароль админа:</label>
+        <input type="password" id="password" placeholder="Введите пароль для сохранения">
+
+        <button onclick="saveData()">💾 Сохранить и обновить сайт</button>
+    </div>
+
+    <script>
+        // Загружаем текущие настройки при входе
+        fetch('/api/data').then(r => r.json()).then(data => {
+            document.getElementById('photo1').value = data.photo1;
+            document.getElementById('photo2').value = data.photo2;
+            document.getElementById('postLink').value = data.postLink;
+            document.getElementById('timer').value = data.timer;
+            document.getElementById('winners').value = data.winners;
+        });
+
+        // Отправляем изменения на сервер
+        function saveData() {
+            const newData = {
+                photo1: document.getElementById('photo1').value,
+                photo2: document.getElementById('photo2').value,
+                postLink: document.getElementById('postLink').value,
+                timer: document.getElementById('timer').value,
+                winners: document.getElementById('winners').value
+            };
+            const password = document.getElementById('password').value;
+
+            fetch('/api/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password, newData })
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.success) alert("✅ Данные успешно обновлены!");
+                else alert("❌ Ошибка: " + res.error);
+            });
+        }
+    </script>
+</body>
+</html>

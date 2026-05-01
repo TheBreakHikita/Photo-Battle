@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Фото Батл 🔥</title>
+    <!-- СЮДА ВСТАВЬ ТОТ ЖЕ <style> ЧТО Я ДАВАЛ В ПЕРВОМ ОТВЕТЕ -->
+    <style>
+        body { background: #121212; color: white; font-family: sans-serif; text-align: center; }
+        img { width: 300px; height: 400px; object-fit: cover; border-radius: 10px; margin: 10px; }
+        .timer { font-size: 2em; color: #ff4757; font-weight: bold; }
+        .btn { display: inline-block; background: #ff4757; color: white; padding: 15px 30px; border-radius: 30px; text-decoration: none; }
+        .player { padding: 5px; margin: 5px; }
+        .winner { color: #2ed573; font-weight: bold; background: rgba(46, 213, 115, 0.2); }
+    </style>
+</head>
+<body>
+
+    <h1>Фото <span>Батл</span></h1>
+
+    <div>
+        <img id="img1" src="" alt="1">
+        <span>VS</span>
+        <img id="img2" src="" alt="2">
+    </div>
+    
+    <div class="timer" id="timer">Загрузка...</div>
+    <a id="voteLink" href="#" class="btn" target="_blank">Голосовать в комментариях</a>
+
+    <hr style="margin: 40px 0; border-color: #333;">
+    <h2>Турнирная сетка</h2>
+    <!-- Пример участников. Те, кто прописан в админке, подсветятся зеленым -->
+    <div class="player" data-name="Игрок 1">😎 Игрок 1</div>
+    <div class="player" data-name="Игрок 2">🤡 Игрок 2</div>
+    <div class="player" data-name="Игрок 4">🤠 Игрок 4</div>
+    <div class="player" data-name="Игрок 7">😺 Игрок 7</div>
+
+<script>
+    let endTime = 0;
+
+    // Загружаем данные с сервера
+    fetch('/api/data')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('img1').src = data.photo1;
+            document.getElementById('img2').src = data.photo2;
+            document.getElementById('voteLink').href = data.postLink;
+            endTime = new Date(data.timer).getTime();
+
+            // Подсвечиваем победителей
+            const winnersArr = data.winners.split(',').map(s => s.trim());
+            document.querySelectorAll('.player').forEach(el => {
+                if(winnersArr.includes(el.getAttribute('data-name'))) {
+                    el.classList.add('winner');
+                }
+            });
+        });
+
+    // Таймер
+    setInterval(() => {
+        if(!endTime) return;
+        const dist = endTime - new Date().getTime();
+        if (dist < 0) return document.getElementById("timer").innerHTML = "БАТЛ ЗАВЕРШЕН!";
+        const h = Math.floor((dist % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+        const m = Math.floor((dist % (1000 * 60 * 60)) / (1000 * 60));
+        const s = Math.floor((dist % (1000 * 60)) / 1000);
+        document.getElementById("timer").innerHTML = `${h}:${m}:${s}`;
+    }, 1000);
+</script>
+</body>
+</html>
