@@ -36,7 +36,6 @@
 
     <h2>1. Режим сайта</h2>
     <select id="modeSelect">
-        <select id="modeSelect">
         <option value="presentation">Режим Презентации (Ожидание турнира)</option>
         <option value="active">Активный Режим (Идет турнир)</option>
     </select>
@@ -46,17 +45,19 @@
     </div>
 
     <h2>2. Участники (Drag & Drop)</h2>
-    <p style="font-size: 0.8em; color: #666;">Перетаскивайте блоки, чтобы определить пары (1-й бьется со 2-м, 3-й с 4-м и т.д.)</p>
+    <p style="font-size: 0.8em; color: #666;">Первые 8 участников попадают в сетку. Остальные — в резерве.</p>
+    <button class="btn" onclick="addParticipant()" style="background: #10b981; width: auto; margin-bottom: 10px;">➕ Добавить участника</button>
     <ul id="participantsList"></ul>
 
     <h2>3. Управление боями (Выбор победителей)</h2>
     <div id="bracketControls"></div>
 
-    <h2>4. Прямо сейчас бой</h2>
-    <div class="form-group"><label>Заголовок:</label><input type="text" id="bTitle"></div>
-    <div class="form-group"><label>Фото 1 (Ссылка):</label><input type="text" id="bPhoto1"></div>
-    <div class="form-group"><label>Фото 2 (Ссылка):</label><input type="text" id="bPhoto2"></div>
-    <div class="form-group"><label>Ссылка на пост голосования:</label><input type="text" id="bLink"></div>
+    <h2>4. Активные бои</h2>
+    <div id="battlesAdminContainer"></div>
+    <button class="btn" onclick="addBattle()" style="background: #10b981; margin-bottom: 20px;">➕ Добавить еще один бой</button>
+
+    <h2>5. Организаторы</h2>
+    <div id="organizersAdminContainer"></div>
 
     <hr style="margin: 30px 0;">
     <div class="form-group">
@@ -71,19 +72,17 @@
 <script>
     let appState = null;
 
-    // Логика связей: откуда победитель переходит куда
     const bracketLogic = {
-        q1: { nextMatch: 's1', slot: 'p1' },
-        q2: { nextMatch: 's1', slot: 'p2' },
-        q3: { nextMatch: 's2', slot: 'p1' },
-        q4: { nextMatch: 's2', slot: 'p2' },
-        s1: { nextMatch: 'f1', slot: 'p1' },
-        s2: { nextMatch: 'f1', slot: 'p2' }
+        q1: { nextMatch: 's1', slot: 'p1' }, q2: { nextMatch: 's1', slot: 'p2' },
+        q3: { nextMatch: 's2', slot: 'p1' }, q4: { nextMatch: 's2', slot: 'p2' },
+        s1: { nextMatch: 'f1', slot: 'p1' }, s2: { nextMatch: 'f1', slot: 'p2' }
     };
 
     async function loadData() {
         const res = await fetch('/api/state');
         appState = await res.json();
+        if(!appState.battles) appState.battles = []; // Защита от старых данных
+        if(!appState.organizers) appState.organizers = [];
         renderAdmin();
     }
 
@@ -91,38 +90,49 @@
         document.getElementById('modeSelect').value = appState.mode;
         document.getElementById('heroStatus').value = appState.heroStatus;
         
-        // Рендер участников
+        renderParticipants();
+        renderBracketControls();
+        renderBattles();
+        renderOrganizers();
+    }
+
+    // --- УЧАСТНИКИ ---
+    function renderParticipants() {
         const list = document.getElementById('participantsList');
         list.innerHTML = '';
-        appState.participants.forEach((p) => {
+        appState.participants.forEach((p, index) => {
             const li = document.createElement('li');
             li.className = 'participant-item';
             li.dataset.id = p.id;
+            // Первые 8 подсвечиваем, остальные прозрачные
+            if(index >= 8) li.style.opacity = '0.5'; 
             li.innerHTML = `
-                <span style="cursor: grab;">↕️</span>
-                <input type="text" value="${p.emoji}" class="p-emoji" style="width: 50px;">
-                <input type="text" value="${p.name}" class="p-name">
+                <span style="cursor: grab; font-size: 1.2em; padding: 0 10px;">↕️</span>
+                <input type="text" value="${p.emoji}" class="p-emoji" style="width: 50px;" placeholder="Смайл">
+                <input type="text" value="${p.name}" class="p-name" placeholder="Никнейм">
+                <button onclick="removeParticipant('${p.id}')" style="background: #ef4444; color: white; border: none; padding: 10px; margin-left: 10px; border-radius: 5px; cursor:pointer;">❌</button>
             `;
             list.appendChild(li);
         });
 
-        // Инициализация Drag and Drop
-        new Sortable(list, {
-            animation: 150,
-            onEnd: updatePairsFromDrag // Обновляем q1-q4 при перетаскивании
-        });
+        new Sortable(list, { animation: 150, onEnd: updatePairsFromDrag });
+    }
 
-        renderBracketControls();
+    function addParticipant() {
+        const newId = 'p' + Date.now();
+        appState.participants.push({ id: newId, emoji: '👤', name: 'Новый участник' });
+        updatePairsFromDrag();
+        renderAdmin();
+    }
 
-        // Рендер текущего боя
-        document.getElementById('bTitle').value = appState.battle.title;
-        document.getElementById('bPhoto1').value = appState.battle.photo1;
-        document.getElementById('bPhoto2').value = appState.battle.photo2;
-        document.getElementById('bLink').value = appState.battle.link;
+    function removeParticipant(id) {
+        if(!confirm('Удалить участника?')) return;
+        appState.participants = appState.participants.filter(p => p.id !== id);
+        updatePairsFromDrag();
+        renderAdmin();
     }
 
     function updatePairsFromDrag() {
-        // Читаем новый порядок из HTML
         const items = document.querySelectorAll('.participant-item');
         appState.participants = Array.from(items).map(item => ({
             id: item.dataset.id,
@@ -130,19 +140,89 @@
             name: item.querySelector('.p-name').value
         }));
 
-        // Обновляем первый этап сетки (q1, q2, q3, q4)
-        appState.matches.q1.p1 = appState.participants[0].id;
-        appState.matches.q1.p2 = appState.participants[1].id;
-        appState.matches.q2.p1 = appState.participants[2].id;
-        appState.matches.q2.p2 = appState.participants[3].id;
-        appState.matches.q3.p1 = appState.participants[4].id;
-        appState.matches.q3.p2 = appState.participants[5].id;
-        appState.matches.q4.p1 = appState.participants[6].id;
-        appState.matches.q4.p2 = appState.participants[7].id;
+        // Безопасное обновление сетки (берем первых 8)
+        const getP = (index) => appState.participants[index] ? appState.participants[index].id : null;
+        
+        appState.matches.q1.p1 = getP(0); appState.matches.q1.p2 = getP(1);
+        appState.matches.q2.p1 = getP(2); appState.matches.q2.p2 = getP(3);
+        appState.matches.q3.p1 = getP(4); appState.matches.q3.p2 = getP(5);
+        appState.matches.q4.p1 = getP(6); appState.matches.q4.p2 = getP(7);
 
+        renderParticipants(); // Обновляем прозрачность запасных
         renderBracketControls();
     }
 
+    // --- БОИ ---
+    function renderBattles() {
+        const container = document.getElementById('battlesAdminContainer');
+        container.innerHTML = '';
+        appState.battles.forEach((b, index) => {
+            container.innerHTML += `
+            <div class="admin-match" style="border-left: 4px solid #3b82f6;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <strong style="font-size: 1.1em;">Бой #${index + 1}</strong>
+                    <button onclick="removeBattle('${b.id}')" style="background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor:pointer;">Удалить бой</button>
+                </div>
+                <div class="form-group"><label>Заголовок:</label><input type="text" class="b-title" value="${b.title}"></div>
+                <div class="form-group"><label>Фото 1:</label><input type="text" class="b-p1" value="${b.photo1}"></div>
+                <div class="form-group"><label>Фото 2:</label><input type="text" class="b-p2" value="${b.photo2}"></div>
+                <div class="form-group"><label>Ссылка на пост:</label><input type="text" class="b-link" value="${b.link}"></div>
+            </div>`;
+        });
+    }
+
+    function addBattle() {
+        appState.battles.push({
+            id: 'b' + Date.now(), title: "Новый бой", photo1: "", photo2: "", link: ""
+        });
+        renderBattles();
+    }
+
+    function removeBattle(id) {
+        appState.battles = appState.battles.filter(b => b.id !== id);
+        renderBattles();
+    }
+
+    function saveBattlesToState() {
+        const battleBlocks = document.querySelectorAll('#battlesAdminContainer .admin-match');
+        appState.battles = Array.from(battleBlocks).map((block, index) => ({
+            id: appState.battles[index].id,
+            title: block.querySelector('.b-title').value,
+            photo1: block.querySelector('.b-p1').value,
+            photo2: block.querySelector('.b-p2').value,
+            link: block.querySelector('.b-link').value
+        }));
+    }
+
+    // --- ОРГАНИЗАТОРЫ ---
+    function renderOrganizers() {
+        const container = document.getElementById('organizersAdminContainer');
+        container.innerHTML = '';
+        appState.organizers.forEach((org, index) => {
+            container.innerHTML += `
+            <div class="admin-match">
+                <strong>Организатор ${index + 1}</strong>
+                <div style="display:flex; gap:10px; margin-top:5px;">
+                    <input type="text" class="o-emoji" value="${org.emoji}" style="width: 60px;" placeholder="Смайл">
+                    <input type="text" class="o-role" value="${org.role}" placeholder="Роль (напр. Ведущий)">
+                </div>
+                <input type="text" class="o-name" value="${org.name}" placeholder="Ник (@name)" style="margin-top:5px;">
+                <input type="text" class="o-link" value="${org.link}" placeholder="Ссылка на профиль (https://...)" style="margin-top:5px;">
+            </div>`;
+        });
+    }
+
+    function saveOrganizersToState() {
+        const blocks = document.querySelectorAll('#organizersAdminContainer .admin-match');
+        appState.organizers = Array.from(blocks).map((block) => ({
+            emoji: block.querySelector('.o-emoji').value,
+            role: block.querySelector('.o-role').value,
+            name: block.querySelector('.o-name').value,
+            link: block.querySelector('.o-link').value
+        }));
+    }
+
+    // --- СЕТКА И СОХРАНЕНИЕ ---
     function getPlayerName(id) {
         if (!id) return "Нет участника";
         const p = appState.participants.find(x => x.id === id);
@@ -152,7 +232,6 @@
     function renderBracketControls() {
         const container = document.getElementById('bracketControls');
         container.innerHTML = '';
-
         Object.keys(appState.matches).forEach(matchId => {
             const m = appState.matches[matchId];
             const div = document.createElement('div');
@@ -160,13 +239,9 @@
             div.innerHTML = `
                 <strong>Матч ${matchId.toUpperCase()}:</strong> 
                 <button class="winner-btn ${m.winner === m.p1 && m.p1 ? 'active' : ''}" 
-                        onclick="setWinner('${matchId}', '${m.p1}')" ${!m.p1 ? 'disabled' : ''}>
-                    Победа: ${getPlayerName(m.p1)}
-                </button>
+                        onclick="setWinner('${matchId}', '${m.p1}')" ${!m.p1 ? 'disabled' : ''}>Победа: ${getPlayerName(m.p1)}</button>
                 <button class="winner-btn ${m.winner === m.p2 && m.p2 ? 'active' : ''}" 
-                        onclick="setWinner('${matchId}', '${m.p2}')" ${!m.p2 ? 'disabled' : ''}>
-                    Победа: ${getPlayerName(m.p2)}
-                </button>
+                        onclick="setWinner('${matchId}', '${m.p2}')" ${!m.p2 ? 'disabled' : ''}>Победа: ${getPlayerName(m.p2)}</button>
             `;
             container.appendChild(div);
         });
@@ -174,23 +249,17 @@
 
     function setWinner(matchId, playerId) {
         if (!playerId || playerId === 'null') return;
-        
-        // Устанавливаем победителя
         appState.matches[matchId].winner = playerId;
-
-        // Автоматически продвигаем его в следующий матч по логике
         const logic = bracketLogic[matchId];
         if (logic) {
             appState.matches[logic.nextMatch][logic.slot] = playerId;
-            // Сбрасываем победителя следующего матча, если участник сменился
             appState.matches[logic.nextMatch].winner = null; 
         }
-        
         renderBracketControls();
     }
 
     function resetTournament() {
-        if(!confirm("Уверены? Это очистит всех победителей и вернет первый этап.")) return;
+        if(!confirm("Очистить сетку?")) return;
         Object.keys(appState.matches).forEach(key => appState.matches[key].winner = null);
         appState.matches.s1.p1 = appState.matches.s1.p2 = null;
         appState.matches.s2.p1 = appState.matches.s2.p2 = null;
@@ -199,16 +268,12 @@
     }
 
     async function saveState() {
-        // Собираем актуальные данные по участникам из инпутов (вдруг сменили ник или смайл)
         updatePairsFromDrag(); 
+        saveBattlesToState();
+        saveOrganizersToState();
 
         appState.mode = document.getElementById('modeSelect').value;
         appState.heroStatus = document.getElementById('heroStatus').value;
-        appState.battle.title = document.getElementById('bTitle').value;
-        appState.battle.photo1 = document.getElementById('bPhoto1').value;
-        appState.battle.photo2 = document.getElementById('bPhoto2').value;
-        appState.battle.link = document.getElementById('bLink').value;
-
         const password = document.getElementById('adminPassword').value;
 
         const res = await fetch('/api/state', {
@@ -218,11 +283,8 @@
         });
 
         const data = await res.json();
-        if (data.success) {
-            alert("✅ Сохранено! Сайт обновлен.");
-        } else {
-            alert("❌ Ошибка: " + data.error);
-        }
+        if (data.success) alert("✅ Сохранено!");
+        else alert("❌ Ошибка: " + data.error);
     }
 
     loadData();

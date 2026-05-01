@@ -78,32 +78,13 @@
         </div>
     </div>
 
-    <!-- Текущий бой -->
-    <section class="battle-section">
-        <h2 id="battleTitle">Прямо сейчас бой</h2>
-        <div class="photos">
-            <div class="photo-wrapper"><img id="photo1" src="" alt="1"></div>
-            <div class="vs">VS</div>
-            <div class="photo-wrapper"><img id="photo2" src="" alt="2"></div>
-        </div>
-        <a id="voteLink" href="#" class="btn" target="_blank">Перейти к посту и проголосовать</a>
-    </section>
+    <!-- Контейнер для всех боев -->
+    <div id="battlesContainer"></div>
 
     <!-- Организаторы -->
     <section>
         <h2>Организаторы</h2>
-        <div class="organizers">
-            <div class="org-card">
-                <h2 style="margin:0">👨‍💻</h2>
-                <h3>Создатель</h3>
-                <a href="#">@creator</a>
-            </div>
-            <div class="org-card">
-                <h2 style="margin:0">🎙️</h2>
-                <h3>Ведущий</h3>
-                <a href="#">@host</a>
-            </div>
-        </div>
+        <div class="organizers" id="organizersContainer"></div>
     </section>
 </div>
 
@@ -144,11 +125,37 @@
             p2Div.className = 'player p2' + (matchData.winner === matchData.p2 && matchData.p2 ? ' winner' : '');
         }
 
-        // Рендер батла
-        document.getElementById('battleTitle').innerText = state.battle.title;
-        document.getElementById('photo1').src = state.battle.photo1;
-        document.getElementById('photo2').src = state.battle.photo2;
-        document.getElementById('voteLink').href = state.battle.link;
+        // Рендер боев (теперь их может быть несколько)
+        const battlesContainer = document.getElementById('battlesContainer');
+        battlesContainer.innerHTML = '';
+        if (state.battles && state.battles.length > 0) {
+            state.battles.forEach(battle => {
+                battlesContainer.innerHTML += `
+                <section class="battle-section">
+                    <h2>${battle.title}</h2>
+                    <div class="photos">
+                        <div class="photo-wrapper"><img src="${battle.photo1}" alt="1"></div>
+                        <div class="vs">VS</div>
+                        <div class="photo-wrapper"><img src="${battle.photo2}" alt="2"></div>
+                    </div>
+                    <a href="${battle.link}" class="btn" target="_blank">Перейти к посту и проголосовать</a>
+                </section>`;
+            });
+        }
+
+        // Рендер организаторов
+        const orgContainer = document.getElementById('organizersContainer');
+        orgContainer.innerHTML = '';
+        if (state.organizers) {
+            state.organizers.forEach(org => {
+                orgContainer.innerHTML += `
+                <div class="org-card">
+                    <h2 style="margin:0">${org.emoji}</h2>
+                    <h3>${org.role}</h3>
+                    <a href="${org.link}" target="_blank">${org.name}</a>
+                </div>`;
+            });
+        }
     }
 
     loadData();
