@@ -34,8 +34,12 @@
         .list-bracket { display: flex; flex-direction: column; gap: 30px; max-width: 600px; margin: 0 auto; text-align: left; }
         .list-round-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 15px; }
         
-        .match { background: var(--surface); padding: 10px; border-radius: 8px; border: 1px solid #334155; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .match { background: var(--surface); padding: 10px; border-radius: 8px; border: 1px solid #334155; box-shadow: 0 4px 6px rgba(0,0,0,0.3); position: relative; z-index: 2; }
         .match.final { border: 2px solid var(--accent); transform: scale(1.05); text-align: center; background: #1e293b; }
+        
+        .split-bracket { position: relative; } /* Нужно для позиционирования линий */
+        .bracket-line { stroke: #334155; stroke-width: 2px; fill: none; transition: stroke 0.3s, stroke-width 0.3s; }
+        .bracket-line.highlight-path { stroke: var(--accent); stroke-width: 4px; filter: drop-shadow(0 0 5px rgba(59, 130, 246, 0.8)); }
         
         .player { padding: 8px; margin: 4px 0; border-radius: 4px; background: #0f172a; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .player.winner { border-left: 4px solid var(--winner); font-weight: bold; background: rgba(34, 197, 94, 0.1); animation: winnerHighlight 1s ease-out; }
@@ -94,11 +98,8 @@
     function setViewMode(mode) {
         currentViewMode = mode;
         localStorage.setItem('bracketViewMode', mode);
-        
-        // Обновляем кнопки
-        document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
-        event.target.classList.add('active');
-        
+        // Мы убрали event.target, так как это ломало скрипт в некоторых браузерах и расширениях.
+        // Кнопки корректно обновятся сами внутри renderBracket().
         renderBracket();
     }
 
@@ -140,7 +141,7 @@
         return nameStr;
     }
 
-    function createMatchHtml(matchData, isFinal = false) {
+    function createMatchHtml(matchData, r, m, isFinal = false) {
         if(!matchData) return '';
         const p1 = getPlayerContent(matchData.p1);
         const p2 = getPlayerContent(matchData.p2);
@@ -155,7 +156,7 @@
         const p2Id = matchData.p2 || 'null';
 
         return `
-            <div class="match ${isFinal ? 'final' : ''}" style="animation-delay: ${delay}s">
+            <div class="match ${isFinal ? 'final' : ''}" id="match-${r}-${m}" style="animation-delay: ${delay}s">
                 ${isFinal ? '<h3 style="color:#3b82f6; margin-bottom:10px;">👑 ФИНАЛ</h3>' : ''}
                 <div class="player ${w1} player-node-${p1Id}" 
                      onmouseenter="highlightPath('${p1Id}')" onmouseleave="clearPath()">
@@ -180,7 +181,6 @@
         }
 
         switcher.style.display = 'flex';
-        // Подсвечиваем активную кнопку при первичной загрузке
         document.querySelectorAll('.view-btn').forEach(btn => {
             btn.classList.remove('active');
             if((btn.innerText.includes('двух') && currentViewMode === 'split') ||
@@ -194,7 +194,6 @@
         let html = '';
 
         if (currentViewMode === 'list') {
-            // --- РЕЖИМ: СПИСОК (Идеально для мобилок) ---
             html += '<div class="list-bracket">';
             for(let r = 1; r <= R; r++) {
                 const isFinal = r === R;
@@ -202,54 +201,51 @@
                 html += '<div class="list-round-grid">';
                 const matchCount = appState.bracketMeta.totalSlots / Math.pow(2, r);
                 for(let m = 1; m <= matchCount; m++) {
-                    html += createMatchHtml(appState.matches[`r${r}_m${m}`], isFinal);
+                    html += createMatchHtml(appState.matches[`r${r}_m${m}`], r, m, isFinal);
                 }
                 html += '</div>';
             }
             html += '</div>';
 
         } else if (currentViewMode === 'linear') {
-            // --- РЕЖИМ: ДЕРЕВО СЛЕВА-НАПРАВО ---
             html += '<div class="split-bracket" style="justify-content: flex-start;">';
+            html += '<svg id="bracketLines" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;"></svg>';
             for(let r = 1; r <= R; r++) {
                 html += '<div class="bracket-col">';
                 const matchCount = appState.bracketMeta.totalSlots / Math.pow(2, r);
                 for(let m = 1; m <= matchCount; m++) {
-                    html += createMatchHtml(appState.matches[`r${r}_m${m}`], r === R);
+                    html += createMatchHtml(appState.matches[`r${r}_m${m}`], r, m, r === R);
                 }
                 html += '</div>';
             }
             html += '</div>';
 
         } else {
-            // --- РЕЖИМ: СПЛИТ (С двух сторон к центру) ---
             if (R === 1) {
-                html += `<div class="split-bracket"><div class="bracket-center">${createMatchHtml(appState.matches['r1_m1'], true)}</div></div>`;
+                html += `<div class="split-bracket"><div class="bracket-center">${createMatchHtml(appState.matches['r1_m1'], 1, 1, true)}</div></div>`;
             } else {
                 html += '<div class="split-bracket">';
+                html += '<svg id="bracketLines" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;"></svg>';
                 
-                // Левое крыло
                 html += '<div class="bracket-side" style="flex-direction: row;">';
                 for(let r = 1; r < R; r++) {
                     html += '<div class="bracket-col">';
                     const totalM = Math.pow(2, R - r);
                     for(let m = 1; m <= totalM / 2; m++) {
-                        html += createMatchHtml(appState.matches[`r${r}_m${m}`]);
+                        html += createMatchHtml(appState.matches[`r${r}_m${m}`], r, m);
                     }
                     html += '</div>';
                 }
                 html += '</div>';
 
-                // Центр
-                html += `<div class="bracket-center">${createMatchHtml(appState.matches[`r${R}_m1`], true)}</div>`;
+                html += `<div class="bracket-center">${createMatchHtml(appState.matches[`r${R}_m1`], R, 1, true)}</div>`;
 
-                // Правое крыло
                 html += '<div class="bracket-side" style="flex-direction: row-reverse;">';
                 for(let r = 1; r < R; r++) {
                     html += '<div class="bracket-col">';
                     const totalM = Math.pow(2, R - r);
                     for(let m = (totalM / 2) + 1; m <= totalM; m++) {
-                        html += createMatchHtml(appState.matches[`r${r}_m${m}`]);
+                        html += createMatchHtml(appState.matches[`r${r}_m${m}`], r, m);
                     }
                     html += '</div>';
                 }
@@ -259,19 +255,26 @@
         }
 
         container.innerHTML = html;
-        if(currentViewMode !== 'list') setupDragToScroll(); // Свайп нужен только для горизонтальных режимов
+        if(currentViewMode !== 'list') {
+            setupDragToScroll();
+            setTimeout(drawLines, 50); // Ждем долю секунды, чтобы DOM обновился, и рисуем линии
+        }
     }
 
     // Функции для подсветки пути
     function highlightPath(playerId) {
         if (!playerId || playerId === 'null') return;
         
-        // Находим все узлы с этим игроком
-        const nodes = document.querySelectorAll(`.player-node-${playerId}`);
-        nodes.forEach(node => {
+        document.querySelectorAll(`.player-node-${playerId}`).forEach(node => {
             node.classList.add('highlight-path');
-            // Подсвечиваем родительский блок матча
             node.closest('.match').classList.add('highlight-path-match');
+        });
+
+        // Подсвечиваем соединительные линии пути
+        document.querySelectorAll(`.path-node-${playerId}`).forEach(line => {
+            line.classList.add('highlight-path');
+            // Переносим линию наверх, чтобы она не перекрывалась серыми линиями
+            line.parentNode.appendChild(line);
         });
     }
 
@@ -279,6 +282,66 @@
         document.querySelectorAll('.highlight-path').forEach(el => el.classList.remove('highlight-path'));
         document.querySelectorAll('.highlight-path-match').forEach(el => el.classList.remove('highlight-path-match'));
     }
+
+    // Рисование соединительных SVG линий между матчами
+    function drawLines() {
+        if (currentViewMode === 'list') return;
+        const svg = document.getElementById('bracketLines');
+        if (!svg) return;
+        
+        let paths = '';
+        const R = appState.bracketMeta.rounds;
+        const svgRect = svg.getBoundingClientRect();
+
+        for(let r = 1; r < R; r++) {
+            const totalM = appState.bracketMeta.totalSlots / Math.pow(2, r);
+            for(let m = 1; m <= totalM; m++) {
+                const el1 = document.getElementById(`match-${r}-${m}`);
+                const nextM = Math.ceil(m / 2);
+                const el2 = document.getElementById(`match-${r+1}-${nextM}`);
+
+                if (el1 && el2) {
+                    const rect1 = el1.getBoundingClientRect();
+                    const rect2 = el2.getBoundingClientRect();
+                    
+                    // Координаты относительно контейнера SVG
+                    let y1 = (rect1.top + rect1.height / 2) - svgRect.top;
+                    let y2 = (rect2.top + rect2.height / 2) - svgRect.top;
+                    let x1, x2;
+
+                    const matchData = appState.matches[`r${r}_m${m}`];
+                    // Если у матча есть победитель, добавляем класс к линии для ее подсветки
+                    const lineClass = (matchData && matchData.winner) ? `path-node-${matchData.winner}` : '';
+
+                    if (currentViewMode === 'linear') {
+                        x1 = rect1.right - svgRect.left;
+                        x2 = rect2.left - svgRect.left;
+                        const midX = x1 + (x2 - x1) / 2;
+                        paths += `<path d="M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}" class="bracket-line ${lineClass}" />`;
+                    } else if (currentViewMode === 'split') {
+                        const isRightSide = m > totalM / 2;
+                        if (isRightSide) {
+                            x1 = rect1.left - svgRect.left;
+                            x2 = rect2.right - svgRect.left;
+                            const midX = x1 - (x1 - x2) / 2;
+                            paths += `<path d="M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}" class="bracket-line ${lineClass}" />`;
+                        } else {
+                            x1 = rect1.right - svgRect.left;
+                            x2 = rect2.left - svgRect.left;
+                            const midX = x1 + (x2 - x1) / 2;
+                            paths += `<path d="M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}" class="bracket-line ${lineClass}" />`;
+                        }
+                    }
+                }
+            }
+        }
+        svg.innerHTML = paths;
+    }
+
+    // Перерисовывать линии при изменении размера окна (на случай поворота телефона)
+    window.addEventListener('resize', () => {
+        if(document.getElementById('bracketLines')) drawLines();
+    });
     
     // Логика для скролла перетаскиванием (drag-to-scroll)
     function setupDragToScroll() {
