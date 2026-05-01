@@ -1,11 +1,10 @@
 {
-  "name": "photo-battle",
-  "version": "1.0.0",
+  "name": "photo-battle-pro",
+  "version": "2.0.0",
   "main": "server.js",
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0",
-    "dotenv": "^17.4.2",
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "@supabase/supabase-js": "^2.39.0"
   },
   "scripts": {
     "start": "node server.js"

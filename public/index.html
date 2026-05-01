@@ -3,69 +3,156 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Фото Батл 🔥</title>
-    <!-- СЮДА ВСТАВЬ ТОТ ЖЕ <style> ЧТО Я ДАВАЛ В ПЕРВОМ ОТВЕТЕ -->
+    <title>Фото Батл</title>
     <style>
-        body { background: #121212; color: white; font-family: sans-serif; text-align: center; }
-        img { width: 300px; height: 400px; object-fit: cover; border-radius: 10px; margin: 10px; }
-        .timer { font-size: 2em; color: #ff4757; font-weight: bold; }
-        .btn { display: inline-block; background: #ff4757; color: white; padding: 15px 30px; border-radius: 30px; text-decoration: none; }
-        .player { padding: 5px; margin: 5px; }
-        .winner { color: #2ed573; font-weight: bold; background: rgba(46, 213, 115, 0.2); }
+        :root {
+            --bg: #0f172a; --surface: #1e293b; --accent: #3b82f6; 
+            --text: #f8fafc; --text-muted: #94a3b8; --winner: #22c55e;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { background: var(--bg); color: var(--text); padding-bottom: 50px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        /* Typography */
+        h1, h2 { text-align: center; margin-bottom: 10px; }
+        .status-badge { display: table; margin: 0 auto 40px; padding: 8px 16px; background: rgba(59, 130, 246, 0.2); color: var(--accent); border-radius: 20px; font-weight: bold; }
+
+        /* Tournament Bracket - Left/Right meeting in center */
+        .bracket-wrapper { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 60px; overflow-x: auto; padding-bottom: 20px; }
+        .bracket-col { display: flex; flex-direction: column; justify-content: space-around; min-width: 200px; gap: 20px; }
+        .center-col { min-width: 250px; align-items: center; }
+        
+        .match { background: var(--surface); padding: 10px; border-radius: 8px; border: 1px solid #334155; position: relative; }
+        .player { padding: 8px; margin: 4px 0; border-radius: 4px; background: #0f172a; font-size: 0.9em; transition: 0.3s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .player.winner { border-left: 4px solid var(--winner); font-weight: bold; }
+        
+        /* Active Battle */
+        .battle-section { background: var(--surface); border-radius: 16px; padding: 40px 20px; text-align: center; margin-bottom: 60px; }
+        .photos { display: flex; justify-content: center; align-items: center; gap: 30px; margin: 30px 0; flex-wrap: wrap; }
+        .photo-wrapper { position: relative; }
+        .photos img { width: 300px; height: 400px; object-fit: cover; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .vs { font-size: 2rem; font-weight: 900; color: var(--accent); background: var(--bg); padding: 20px; border-radius: 50%; }
+        
+        .btn { display: inline-block; background: var(--accent); color: white; padding: 16px 40px; border-radius: 30px; text-decoration: none; font-weight: bold; font-size: 1.1em; transition: 0.2s; }
+        .btn:hover { background: #2563eb; transform: translateY(-2px); }
+
+        /* Organizers */
+        .organizers { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
+        .org-card { background: var(--surface); padding: 20px; border-radius: 12px; width: 250px; text-align: center; }
+        .org-card h3 { margin: 10px 0 5px; }
+        .org-card a { color: var(--accent); text-decoration: none; }
     </style>
 </head>
 <body>
 
-    <h1>Фото <span>Батл</span></h1>
+<div class="container">
+    <h1>Фото Батл</h1>
+    <div id="statusBadge" class="status-badge">Загрузка...</div>
 
-    <div>
-        <img id="img1" src="" alt="1">
-        <span>VS</span>
-        <img id="img2" src="" alt="2">
+    <!-- Турнирная сетка (5 колонок) -->
+    <div class="bracket-wrapper">
+        <!-- Левое крыло (1/4) -->
+        <div class="bracket-col" id="col-l-q">
+            <div class="match" id="m-q1"><div class="player p1"></div><div class="player p2"></div></div>
+            <div class="match" id="m-q2"><div class="player p1"></div><div class="player p2"></div></div>
+        </div>
+        <!-- Левое крыло (1/2) -->
+        <div class="bracket-col" id="col-l-s">
+            <div class="match" id="m-s1"><div class="player p1"></div><div class="player p2"></div></div>
+        </div>
+        <!-- Центр (Финал) -->
+        <div class="bracket-col center-col" id="col-c-f">
+            <h2>ФИНАЛ</h2>
+            <div class="match" id="m-f1" style="border-color: var(--accent); border-width: 2px;">
+                <div class="player p1"></div><div class="player p2"></div>
+            </div>
+        </div>
+        <!-- Правое крыло (1/2) -->
+        <div class="bracket-col" id="col-r-s">
+            <div class="match" id="m-s2"><div class="player p1"></div><div class="player p2"></div></div>
+        </div>
+        <!-- Правое крыло (1/4) -->
+        <div class="bracket-col" id="col-r-q">
+            <div class="match" id="m-q3"><div class="player p1"></div><div class="player p2"></div></div>
+            <div class="match" id="m-q4"><div class="player p1"></div><div class="player p2"></div></div>
+        </div>
     </div>
-    
-    <div class="timer" id="timer">Загрузка...</div>
-    <a id="voteLink" href="#" class="btn" target="_blank">Голосовать в комментариях</a>
 
-    <hr style="margin: 40px 0; border-color: #333;">
-    <h2>Турнирная сетка</h2>
-    <!-- Пример участников. Те, кто прописан в админке, подсветятся зеленым -->
-    <div class="player" data-name="Игрок 1">😎 Игрок 1</div>
-    <div class="player" data-name="Игрок 2">🤡 Игрок 2</div>
-    <div class="player" data-name="Игрок 4">🤠 Игрок 4</div>
-    <div class="player" data-name="Игрок 7">😺 Игрок 7</div>
+    <!-- Текущий бой -->
+    <section class="battle-section">
+        <h2 id="battleTitle">Прямо сейчас бой</h2>
+        <div class="photos">
+            <div class="photo-wrapper"><img id="photo1" src="" alt="1"></div>
+            <div class="vs">VS</div>
+            <div class="photo-wrapper"><img id="photo2" src="" alt="2"></div>
+        </div>
+        <a id="voteLink" href="#" class="btn" target="_blank">Перейти к посту и проголосовать</a>
+    </section>
+
+    <!-- Организаторы -->
+    <section>
+        <h2>Организаторы</h2>
+        <div class="organizers">
+            <div class="org-card">
+                <h2 style="margin:0">👨‍💻</h2>
+                <h3>Создатель</h3>
+                <a href="#">@creator</a>
+            </div>
+            <div class="org-card">
+                <h2 style="margin:0">🎙️</h2>
+                <h3>Ведущий</h3>
+                <a href="#">@host</a>
+            </div>
+        </div>
+    </section>
+</div>
 
 <script>
-    let endTime = 0;
+    async function loadData() {
+        const res = await fetch('/api/state');
+        const state = await res.json();
+        render(state);
+    }
 
-    // Загружаем данные с сервера
-    fetch('/api/data')
-        .then(res => res.json())
-        .then(data => {
-            document.getElementById('img1').src = data.photo1;
-            document.getElementById('img2').src = data.photo2;
-            document.getElementById('voteLink').href = data.postLink;
-            endTime = new Date(data.timer).getTime();
+    function getPlayerContent(id, state) {
+        if (!id) return "--- Ожидание ---";
+        const p = state.participants.find(x => x.id === id);
+        return p ? `${p.emoji} ${p.name}` : "Неизвестно";
+    }
 
-            // Подсвечиваем победителей
-            const winnersArr = data.winners.split(',').map(s => s.trim());
-            document.querySelectorAll('.player').forEach(el => {
-                if(winnersArr.includes(el.getAttribute('data-name'))) {
-                    el.classList.add('winner');
-                }
-            });
-        });
+    function render(state) {
+        // Установка бейджа
+        document.getElementById('statusBadge').innerText = state.heroStatus;
+        if (state.mode === 'presentation') {
+            document.getElementById('statusBadge').style.background = 'rgba(255,255,255,0.1)';
+            document.getElementById('statusBadge').style.color = 'white';
+        }
 
-    // Таймер
-    setInterval(() => {
-        if(!endTime) return;
-        const dist = endTime - new Date().getTime();
-        if (dist < 0) return document.getElementById("timer").innerHTML = "БАТЛ ЗАВЕРШЕН!";
-        const h = Math.floor((dist % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const m = Math.floor((dist % (1000 * 60 * 60)) / (1000 * 60));
-        const s = Math.floor((dist % (1000 * 60)) / 1000);
-        document.getElementById("timer").innerHTML = `${h}:${m}:${s}`;
-    }, 1000);
+        // Рендер сетки
+        for (const [matchId, matchData] of Object.entries(state.matches)) {
+            const matchDiv = document.getElementById(`m-${matchId}`);
+            if(!matchDiv) continue;
+            
+            const p1Div = matchDiv.querySelector('.p1');
+            const p2Div = matchDiv.querySelector('.p2');
+
+            p1Div.innerHTML = getPlayerContent(matchData.p1, state);
+            p2Div.innerHTML = getPlayerContent(matchData.p2, state);
+
+            // Подсветка победителя
+            p1Div.className = 'player p1' + (matchData.winner === matchData.p1 && matchData.p1 ? ' winner' : '');
+            p2Div.className = 'player p2' + (matchData.winner === matchData.p2 && matchData.p2 ? ' winner' : '');
+        }
+
+        // Рендер батла
+        document.getElementById('battleTitle').innerText = state.battle.title;
+        document.getElementById('photo1').src = state.battle.photo1;
+        document.getElementById('photo2').src = state.battle.photo2;
+        document.getElementById('voteLink').href = state.battle.link;
+    }
+
+    loadData();
+    setInterval(loadData, 10000); // Автообновление каждые 10 сек (на случай долгого открытого окна)
 </script>
 </body>
 </html>

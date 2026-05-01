@@ -2,73 +2,230 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Админка Батла</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админка</title>
+    <!-- Подключаем библиотеку для Drag-and-Drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #f4f4f9; padding: 20px; max-width: 600px; margin: auto; }
-        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        input, button { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }
-        button { background: #ff4757; color: white; border: none; font-weight: bold; cursor: pointer; }
-        label { font-weight: bold; font-size: 0.9em; }
+        body { font-family: sans-serif; background: #f4f4f9; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; }
+        
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        
+        .btn { background: #3b82f6; color: white; border: none; padding: 12px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
+        .btn-danger { background: #ef4444; }
+        
+        /* Участники D&D */
+        #participantsList { list-style: none; padding: 0; }
+        .participant-item { display: flex; align-items: center; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; margin-bottom: 5px; border-radius: 5px; cursor: grab; }
+        .participant-item input { margin-left: 10px; width: auto; flex-grow: 1; }
+        
+        /* Сетка в админке */
+        .admin-match { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px; background: #fafafa; }
+        .admin-match button { margin: 5px; padding: 5px 10px; cursor: pointer; }
+        .winner-btn.active { background: #22c55e; color: white; border-color: #22c55e; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2>⚙️ Управление Батлом</h2>
-        
-        <label>Ссылка на Фото 1:</label>
-        <input type="text" id="photo1">
 
-        <label>Ссылка на Фото 2:</label>
-        <input type="text" id="photo2">
+<div class="container">
+    <h1>⚙️ Управление Турниром</h1>
 
-        <label>Ссылка на пост с голосованием:</label>
-        <input type="text" id="postLink">
-
-        <label>Конец батла (Дата и время):</label>
-        <input type="datetime-local" id="timer">
-
-        <label>Победители (имена через запятую, например: Игрок 1, Игрок 4):</label>
-        <input type="text" id="winners">
-
-        <hr>
-        <label>Пароль админа:</label>
-        <input type="password" id="password" placeholder="Введите пароль для сохранения">
-
-        <button onclick="saveData()">💾 Сохранить и обновить сайт</button>
+    <h2>1. Режим сайта</h2>
+    <select id="modeSelect">
+        <select id="modeSelect">
+        <option value="presentation">Режим Презентации (Ожидание турнира)</option>
+        <option value="active">Активный Режим (Идет турнир)</option>
+    </select>
+    <div class="form-group" style="margin-top: 10px;">
+        <label>Статус (под главным заголовком):</label>
+        <input type="text" id="heroStatus">
     </div>
 
-    <script>
-        // Загружаем текущие настройки при входе
-        fetch('/api/data').then(r => r.json()).then(data => {
-            document.getElementById('photo1').value = data.photo1;
-            document.getElementById('photo2').value = data.photo2;
-            document.getElementById('postLink').value = data.postLink;
-            document.getElementById('timer').value = data.timer;
-            document.getElementById('winners').value = data.winners;
+    <h2>2. Участники (Drag & Drop)</h2>
+    <p style="font-size: 0.8em; color: #666;">Перетаскивайте блоки, чтобы определить пары (1-й бьется со 2-м, 3-й с 4-м и т.д.)</p>
+    <ul id="participantsList"></ul>
+
+    <h2>3. Управление боями (Выбор победителей)</h2>
+    <div id="bracketControls"></div>
+
+    <h2>4. Прямо сейчас бой</h2>
+    <div class="form-group"><label>Заголовок:</label><input type="text" id="bTitle"></div>
+    <div class="form-group"><label>Фото 1 (Ссылка):</label><input type="text" id="bPhoto1"></div>
+    <div class="form-group"><label>Фото 2 (Ссылка):</label><input type="text" id="bPhoto2"></div>
+    <div class="form-group"><label>Ссылка на пост голосования:</label><input type="text" id="bLink"></div>
+
+    <hr style="margin: 30px 0;">
+    <div class="form-group">
+        <label style="color: #ef4444;">Пароль администратора:</label>
+        <input type="password" id="adminPassword" placeholder="Введите пароль для сохранения">
+    </div>
+    
+    <button class="btn" onclick="saveState()">💾 Сохранить и применить на сайте</button>
+    <button class="btn btn-danger" onclick="resetTournament()" style="margin-top: 20px;">⚠️ Сбросить сетку (Начать заново)</button>
+</div>
+
+<script>
+    let appState = null;
+
+    // Логика связей: откуда победитель переходит куда
+    const bracketLogic = {
+        q1: { nextMatch: 's1', slot: 'p1' },
+        q2: { nextMatch: 's1', slot: 'p2' },
+        q3: { nextMatch: 's2', slot: 'p1' },
+        q4: { nextMatch: 's2', slot: 'p2' },
+        s1: { nextMatch: 'f1', slot: 'p1' },
+        s2: { nextMatch: 'f1', slot: 'p2' }
+    };
+
+    async function loadData() {
+        const res = await fetch('/api/state');
+        appState = await res.json();
+        renderAdmin();
+    }
+
+    function renderAdmin() {
+        document.getElementById('modeSelect').value = appState.mode;
+        document.getElementById('heroStatus').value = appState.heroStatus;
+        
+        // Рендер участников
+        const list = document.getElementById('participantsList');
+        list.innerHTML = '';
+        appState.participants.forEach((p) => {
+            const li = document.createElement('li');
+            li.className = 'participant-item';
+            li.dataset.id = p.id;
+            li.innerHTML = `
+                <span style="cursor: grab;">↕️</span>
+                <input type="text" value="${p.emoji}" class="p-emoji" style="width: 50px;">
+                <input type="text" value="${p.name}" class="p-name">
+            `;
+            list.appendChild(li);
         });
 
-        // Отправляем изменения на сервер
-        function saveData() {
-            const newData = {
-                photo1: document.getElementById('photo1').value,
-                photo2: document.getElementById('photo2').value,
-                postLink: document.getElementById('postLink').value,
-                timer: document.getElementById('timer').value,
-                winners: document.getElementById('winners').value
-            };
-            const password = document.getElementById('password').value;
+        // Инициализация Drag and Drop
+        new Sortable(list, {
+            animation: 150,
+            onEnd: updatePairsFromDrag // Обновляем q1-q4 при перетаскивании
+        });
 
-            fetch('/api/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password, newData })
-            })
-            .then(res => res.json())
-            .then(res => {
-                if (res.success) alert("✅ Данные успешно обновлены!");
-                else alert("❌ Ошибка: " + res.error);
-            });
+        renderBracketControls();
+
+        // Рендер текущего боя
+        document.getElementById('bTitle').value = appState.battle.title;
+        document.getElementById('bPhoto1').value = appState.battle.photo1;
+        document.getElementById('bPhoto2').value = appState.battle.photo2;
+        document.getElementById('bLink').value = appState.battle.link;
+    }
+
+    function updatePairsFromDrag() {
+        // Читаем новый порядок из HTML
+        const items = document.querySelectorAll('.participant-item');
+        appState.participants = Array.from(items).map(item => ({
+            id: item.dataset.id,
+            emoji: item.querySelector('.p-emoji').value,
+            name: item.querySelector('.p-name').value
+        }));
+
+        // Обновляем первый этап сетки (q1, q2, q3, q4)
+        appState.matches.q1.p1 = appState.participants[0].id;
+        appState.matches.q1.p2 = appState.participants[1].id;
+        appState.matches.q2.p1 = appState.participants[2].id;
+        appState.matches.q2.p2 = appState.participants[3].id;
+        appState.matches.q3.p1 = appState.participants[4].id;
+        appState.matches.q3.p2 = appState.participants[5].id;
+        appState.matches.q4.p1 = appState.participants[6].id;
+        appState.matches.q4.p2 = appState.participants[7].id;
+
+        renderBracketControls();
+    }
+
+    function getPlayerName(id) {
+        if (!id) return "Нет участника";
+        const p = appState.participants.find(x => x.id === id);
+        return p ? `${p.emoji} ${p.name}` : "Неизвестно";
+    }
+
+    function renderBracketControls() {
+        const container = document.getElementById('bracketControls');
+        container.innerHTML = '';
+
+        Object.keys(appState.matches).forEach(matchId => {
+            const m = appState.matches[matchId];
+            const div = document.createElement('div');
+            div.className = 'admin-match';
+            div.innerHTML = `
+                <strong>Матч ${matchId.toUpperCase()}:</strong> 
+                <button class="winner-btn ${m.winner === m.p1 && m.p1 ? 'active' : ''}" 
+                        onclick="setWinner('${matchId}', '${m.p1}')" ${!m.p1 ? 'disabled' : ''}>
+                    Победа: ${getPlayerName(m.p1)}
+                </button>
+                <button class="winner-btn ${m.winner === m.p2 && m.p2 ? 'active' : ''}" 
+                        onclick="setWinner('${matchId}', '${m.p2}')" ${!m.p2 ? 'disabled' : ''}>
+                    Победа: ${getPlayerName(m.p2)}
+                </button>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function setWinner(matchId, playerId) {
+        if (!playerId || playerId === 'null') return;
+        
+        // Устанавливаем победителя
+        appState.matches[matchId].winner = playerId;
+
+        // Автоматически продвигаем его в следующий матч по логике
+        const logic = bracketLogic[matchId];
+        if (logic) {
+            appState.matches[logic.nextMatch][logic.slot] = playerId;
+            // Сбрасываем победителя следующего матча, если участник сменился
+            appState.matches[logic.nextMatch].winner = null; 
         }
-    </script>
+        
+        renderBracketControls();
+    }
+
+    function resetTournament() {
+        if(!confirm("Уверены? Это очистит всех победителей и вернет первый этап.")) return;
+        Object.keys(appState.matches).forEach(key => appState.matches[key].winner = null);
+        appState.matches.s1.p1 = appState.matches.s1.p2 = null;
+        appState.matches.s2.p1 = appState.matches.s2.p2 = null;
+        appState.matches.f1.p1 = appState.matches.f1.p2 = null;
+        renderAdmin();
+    }
+
+    async function saveState() {
+        // Собираем актуальные данные по участникам из инпутов (вдруг сменили ник или смайл)
+        updatePairsFromDrag(); 
+
+        appState.mode = document.getElementById('modeSelect').value;
+        appState.heroStatus = document.getElementById('heroStatus').value;
+        appState.battle.title = document.getElementById('bTitle').value;
+        appState.battle.photo1 = document.getElementById('bPhoto1').value;
+        appState.battle.photo2 = document.getElementById('bPhoto2').value;
+        appState.battle.link = document.getElementById('bLink').value;
+
+        const password = document.getElementById('adminPassword').value;
+
+        const res = await fetch('/api/state', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password, newState: appState })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+            alert("✅ Сохранено! Сайт обновлен.");
+        } else {
+            alert("❌ Ошибка: " + data.error);
+        }
+    }
+
+    loadData();
+</script>
 </body>
 </html>
