@@ -25,6 +25,14 @@
         .bracket-side { display: flex; gap: 30px; }
         .bracket-col { display: flex; flex-direction: column; justify-content: space-around; width: 220px; gap: 15px; }
         .bracket-center { display: flex; flex-direction: column; justify-content: center; width: 260px; margin: 0 10px; }
+        /* Режимы отображения */
+        .view-switcher { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-bottom: 30px; }
+        .view-btn { background: var(--surface); border: 1px solid #334155; color: var(--text); padding: 8px 16px; border-radius: 20px; cursor: pointer; transition: 0.2s; font-size: 0.9em; }
+        .view-btn.active { background: var(--accent); border-color: var(--accent); font-weight: bold; }
+        
+        /* List Bracket (Списком для мобилок) */
+        .list-bracket { display: flex; flex-direction: column; gap: 30px; max-width: 600px; margin: 0 auto; text-align: left; }
+        .list-round-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 15px; }
         
         .match { background: var(--surface); padding: 10px; border-radius: 8px; border: 1px solid #334155; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .match.final { border: 2px solid var(--accent); transform: scale(1.05); text-align: center; background: #1e293b; }
@@ -68,11 +76,31 @@
 <a href="/" class="back-btn">⬅ Назад к батлам</a>
 <h1>Турнирная сетка</h1>
 
+<!-- Переключатель видов -->
+<div class="view-switcher" id="viewSwitcher" style="display: none;">
+    <button class="view-btn active" onclick="setViewMode('split')">С двух сторон</button>
+    <button class="view-btn" onclick="setViewMode('linear')">Слева направо</button>
+    <button class="view-btn" onclick="setViewMode('list')">📱 Списком</button>
+</div>
+
 <div id="bracketContainer" style="text-align: center; color: var(--text-muted);">Загрузка...</div>
 
 <script>
     let appState = null;
     let lastStateHash = "";
+    // Загружаем сохраненный режим отображения. Для мобилок по умолчанию ставим "list"
+    let currentViewMode = localStorage.getItem('bracketViewMode') || (window.innerWidth < 768 ? 'list' : 'split');
+
+    function setViewMode(mode) {
+        currentViewMode = mode;
+        localStorage.setItem('bracketViewMode', mode);
+        
+        // Обновляем кнопки
+        document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
+        event.target.classList.add('active');
+        
+        renderBracket();
+    }
 
     async function loadData() {
         try {
@@ -143,54 +171,95 @@
 
     function renderBracket() {
         const container = document.getElementById('bracketContainer');
+        const switcher = document.getElementById('viewSwitcher');
+        
         if (!appState.bracketMeta || !appState.bracketMeta.rounds) {
             container.innerHTML = "Сетка еще не сформирована администратором.";
+            switcher.style.display = 'none';
             return;
         }
+
+        switcher.style.display = 'flex';
+        // Подсвечиваем активную кнопку при первичной загрузке
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if((btn.innerText.includes('двух') && currentViewMode === 'split') ||
+               (btn.innerText.includes('Слева') && currentViewMode === 'linear') ||
+               (btn.innerText.includes('Списком') && currentViewMode === 'list')) {
+                btn.classList.add('active');
+            }
+        });
 
         const R = appState.bracketMeta.rounds;
-        
-        // Если участников всего 2 (сразу финал)
-        if (R === 1) {
-            container.innerHTML = `<div class="split-bracket"><div class="bracket-center">${createMatchHtml(appState.matches['r1_m1'], true)}</div></div>`;
-            return;
-        }
+        let html = '';
 
-        let html = '<div class="split-bracket">';
-
-        // --- ЛЕВОЕ КРЫЛО ---
-        html += '<div class="bracket-side" style="flex-direction: row;">';
-        for(let r = 1; r < R; r++) {
-            html += '<div class="bracket-col">';
-            const totalMatchesInRound = Math.pow(2, R - r);
-            const halfMatches = totalMatchesInRound / 2;
-            for(let m = 1; m <= halfMatches; m++) {
-                html += createMatchHtml(appState.matches[`r${r}_m${m}`]);
+        if (currentViewMode === 'list') {
+            // --- РЕЖИМ: СПИСОК (Идеально для мобилок) ---
+            html += '<div class="list-bracket">';
+            for(let r = 1; r <= R; r++) {
+                const isFinal = r === R;
+                html += `<h3 style="color:var(--accent); margin-top:20px; text-align:center;">Раунд ${r} ${isFinal ? '👑 (ФИНАЛ)' : ''}</h3>`;
+                html += '<div class="list-round-grid">';
+                const matchCount = appState.bracketMeta.totalSlots / Math.pow(2, r);
+                for(let m = 1; m <= matchCount; m++) {
+                    html += createMatchHtml(appState.matches[`r${r}_m${m}`], isFinal);
+                }
+                html += '</div>';
             }
             html += '</div>';
-        }
-        html += '</div>';
 
-        // --- ЦЕНТР (ФИНАЛ) ---
-        html += `<div class="bracket-center">${createMatchHtml(appState.matches[`r${R}_m1`], true)}</div>`;
-
-        // --- ПРАВОЕ КРЫЛО ---
-        html += '<div class="bracket-side" style="flex-direction: row-reverse;">'; // row-reverse разворачивает колонки к центру
-        for(let r = 1; r < R; r++) {
-            html += '<div class="bracket-col">';
-            const totalMatchesInRound = Math.pow(2, R - r);
-            const halfMatches = totalMatchesInRound / 2;
-            // Берем вторую половину матчей раунда
-            for(let m = halfMatches + 1; m <= totalMatchesInRound; m++) {
-                html += createMatchHtml(appState.matches[`r${r}_m${m}`]);
+        } else if (currentViewMode === 'linear') {
+            // --- РЕЖИМ: ДЕРЕВО СЛЕВА-НАПРАВО ---
+            html += '<div class="split-bracket" style="justify-content: flex-start;">';
+            for(let r = 1; r <= R; r++) {
+                html += '<div class="bracket-col">';
+                const matchCount = appState.bracketMeta.totalSlots / Math.pow(2, r);
+                for(let m = 1; m <= matchCount; m++) {
+                    html += createMatchHtml(appState.matches[`r${r}_m${m}`], r === R);
+                }
+                html += '</div>';
             }
             html += '</div>';
-        }
-        html += '</div>';
 
-        html += '</div>'; // Конец split-bracket
+        } else {
+            // --- РЕЖИМ: СПЛИТ (С двух сторон к центру) ---
+            if (R === 1) {
+                html += `<div class="split-bracket"><div class="bracket-center">${createMatchHtml(appState.matches['r1_m1'], true)}</div></div>`;
+            } else {
+                html += '<div class="split-bracket">';
+                
+                // Левое крыло
+                html += '<div class="bracket-side" style="flex-direction: row;">';
+                for(let r = 1; r < R; r++) {
+                    html += '<div class="bracket-col">';
+                    const totalM = Math.pow(2, R - r);
+                    for(let m = 1; m <= totalM / 2; m++) {
+                        html += createMatchHtml(appState.matches[`r${r}_m${m}`]);
+                    }
+                    html += '</div>';
+                }
+                html += '</div>';
+
+                // Центр
+                html += `<div class="bracket-center">${createMatchHtml(appState.matches[`r${R}_m1`], true)}</div>`;
+
+                // Правое крыло
+                html += '<div class="bracket-side" style="flex-direction: row-reverse;">';
+                for(let r = 1; r < R; r++) {
+                    html += '<div class="bracket-col">';
+                    const totalM = Math.pow(2, R - r);
+                    for(let m = (totalM / 2) + 1; m <= totalM; m++) {
+                        html += createMatchHtml(appState.matches[`r${r}_m${m}`]);
+                    }
+                    html += '</div>';
+                }
+                html += '</div>';
+                html += '</div>';
+            }
+        }
+
         container.innerHTML = html;
-        setupDragToScroll(); // Инициализация свайпа после рендера
+        if(currentViewMode !== 'list') setupDragToScroll(); // Свайп нужен только для горизонтальных режимов
     }
 
     // Функции для подсветки пути

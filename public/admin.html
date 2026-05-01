@@ -33,10 +33,18 @@
         .login-box { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 300px; text-align: center; }
         
         /* Кнопки импорта/экспорта */
-        .flex-buttons { display: flex; gap: 10px; margin-bottom: 20px; }
-        .flex-buttons .btn { margin-top: 0; }
+        .flex-buttons { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .flex-buttons .btn { margin-top: 0; flex: 1; min-width: 200px; }
         .btn-outline { background: transparent; border: 2px solid #3b82f6; color: #3b82f6; }
         .btn-outline:hover { background: #eff6ff; }
+
+        /* Mobile Adaptation */
+        @media (max-width: 600px) {
+            .participant-item { flex-direction: column; align-items: stretch; text-align: center; padding: 15px; }
+            .participant-item input { margin: 5px 0; width: 100% !important; }
+            .participant-item button { margin: 5px 0 0 0; }
+            .container { padding: 15px; }
+        }
     </style>
     <link rel="icon" href="data:,">
 </head>
