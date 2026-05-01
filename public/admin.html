@@ -28,11 +28,41 @@
         .admin-match button { margin: 5px; padding: 5px 10px; cursor: pointer; }
         .winner-btn.active { background: #22c55e; color: white; border-color: #22c55e; }
     </style>
+    /* Экран логина */
+        #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f4f4f9; display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .login-box { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 300px; text-align: center; }
+        
+        /* Кнопки импорта/экспорта */
+        .flex-buttons { display: flex; gap: 10px; margin-bottom: 20px; }
+        .flex-buttons .btn { margin-top: 0; }
+        .btn-outline { background: transparent; border: 2px solid #3b82f6; color: #3b82f6; }
+        .btn-outline:hover { background: #eff6ff; }
+    </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>⚙️ Управление Турниром</h1>
+<div id="loginScreen">
+    <div class="login-box">
+        <h2>Вход в панель</h2>
+        <input type="password" id="loginPassword" placeholder="Пароль администратора" style="margin: 20px 0;">
+        <button class="btn" onclick="login()">Войти</button>
+    </div>
+</div>
+
+<div class="container" id="adminContainer" style="display: none;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1>⚙️ Управление Турниром</h1>
+        <button class="btn btn-danger" style="width: auto; padding: 8px 15px;" onclick="logout()">Выйти</button>
+    </div>
+
+    <!-- Блок бэкапов -->
+    <div class="flex-buttons" style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-top: 20px;">
+        <button class="btn btn-outline" onclick="exportState()">⬇️ Экспорт бэкапа (JSON)</button>
+        <label class="btn btn-outline" style="cursor: pointer; text-align: center;">
+            ⬆️ Импорт из бэкапа
+            <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importState(event)">
+        </label>
+    </div>
 
     <h2>1. Режим сайта</h2>
     <select id="modeSelect">
@@ -51,6 +81,7 @@
     <button class="btn" onclick="generateBracket()" style="background: #8b5cf6; margin-top: 15px;">⚡ Сгенерировать турнирную сетку</button>
 
     <h2>3. Управление боями (Выбор победителей)</h2>
+    <a href="/bracket.html" target="_blank" class="btn" style="background: #334155; display: inline-block; text-align: center; margin-bottom: 15px; text-decoration: none;">👀 Посмотреть готовую сетку</a>
     <div id="bracketControls"></div>
 
     <h2>4. Активные бои</h2>
@@ -61,17 +92,64 @@
     <div id="organizersAdminContainer"></div>
 
     <hr style="margin: 30px 0;">
-    <div class="form-group">
-        <label style="color: #ef4444;">Пароль администратора:</label>
-        <input type="password" id="adminPassword" placeholder="Введите пароль для сохранения">
-    </div>
-    
-    <button class="btn" onclick="saveState()">💾 Сохранить и применить на сайте</button>
+    <button class="btn" onclick="saveState()" style="font-size: 1.1em; padding: 15px;">💾 Сохранить и применить на сайте</button>
     <button class="btn btn-danger" onclick="resetTournament()" style="margin-top: 20px;">⚠️ Сбросить сетку (Начать заново)</button>
 </div>
 
 <script>
     let appState = null;
+    let authToken = localStorage.getItem('adminToken');
+
+    // Логика аутентификации
+    if (authToken) { showAdmin(); }
+
+    async function login() {
+        const pass = document.getElementById('loginPassword').value;
+        const res = await fetch('/api/login', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pass })
+        });
+        const data = await res.json();
+        if (data.token) {
+            authToken = data.token;
+            localStorage.setItem('adminToken', authToken);
+            showAdmin();
+        } else { alert("Неверный пароль!"); }
+    }
+
+    function logout() {
+        localStorage.removeItem('adminToken');
+        location.reload();
+    }
+
+    function showAdmin() {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('adminContainer').style.display = 'block';
+        loadData();
+    }
+
+    // Логика импорта/экспорта
+    function exportState() {
+        if(!appState) return alert("Данные еще не загружены!");
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appState));
+        const dl = document.createElement('a');
+        dl.setAttribute("href", dataStr);
+        dl.setAttribute("download", `photo_battle_backup_${new Date().toISOString().slice(0,10)}.json`);
+        dl.click();
+    }
+
+    function importState(event) {
+        const file = event.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                appState = JSON.parse(e.target.result);
+                renderAdmin();
+                alert("Успешно импортировано! Нажмите 'Сохранить', чтобы применить изменения на сервере.");
+            } catch(err) { alert("Ошибка чтения файла JSON!"); }
+        };
+        reader.readAsText(file);
+    }
 
     async function loadData() {
         const res = await fetch('/api/state');
@@ -103,8 +181,9 @@
             li.innerHTML = `
                 <span style="cursor: grab; font-size: 1.2em; padding: 0 10px;">↕️</span>
                 <span style="font-weight:bold; color:#888; width: 30px;">#${index+1}</span>
-                <input type="text" value="${p.emoji}" class="p-emoji" style="width: 50px;" placeholder="Смайл">
+               <input type="text" value="${p.emoji}" class="p-emoji" style="width: 50px;" placeholder="Смайл">
                 <input type="text" value="${p.name}" class="p-name" placeholder="Никнейм">
+                <input type="text" value="${p.link || ''}" class="p-link" placeholder="Ссылка на профиль">
                 <button onclick="removeParticipant('${p.id}')" style="background: #ef4444; color: white; border: none; padding: 10px; margin-left: 10px; border-radius: 5px; cursor:pointer;">❌</button>
             `;
             list.appendChild(li);
@@ -115,7 +194,7 @@
     }
 
     function addParticipant() {
-        appState.participants.push({ id: 'p' + Date.now(), emoji: '👤', name: 'Новый участник' });
+        appState.participants.push({ id: 'p' + Date.now(), emoji: '👤', name: 'Новый участник', link: '' });
         renderParticipants();
     }
 
@@ -130,7 +209,8 @@
         appState.participants = Array.from(items).map(item => ({
             id: item.dataset.id,
             emoji: item.querySelector('.p-emoji').value,
-            name: item.querySelector('.p-name').value
+            name: item.querySelector('.p-name').value,
+            link: item.querySelector('.p-link').value // Сохраняем ссылку
         }));
     }
 
@@ -240,11 +320,20 @@
         const container = document.getElementById('battlesAdminContainer');
         container.innerHTML = '';
         appState.battles.forEach((b, index) => {
+            const statusActive = (!b.status || b.status === 'active') ? 'selected' : '';
+            const statusFinished = b.status === 'finished' ? 'selected' : '';
             container.innerHTML += `
             <div class="admin-match" style="border-left: 4px solid #3b82f6;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <strong style="font-size: 1.1em;">Бой #${index + 1}</strong>
                     <button onclick="removeBattle('${b.id}')" style="background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor:pointer;">Удалить бой</button>
+                </div>
+                <div class="form-group">
+                    <label>Статус боя:</label>
+                    <select class="b-status">
+                        <option value="active" ${statusActive}>🟢 Идет голосование</option>
+                        <option value="finished" ${statusFinished}>🔴 Победитель выбран (Завершено)</option>
+                    </select>
                 </div>
                 <div class="form-group"><label>Заголовок:</label><input type="text" class="b-title" value="${b.title}"></div>
                 <div class="form-group"><label>Фото 1:</label><input type="text" class="b-p1" value="${b.photo1}"></div>
@@ -254,13 +343,17 @@
         });
     }
 
-    function addBattle() { appState.battles.push({ id: 'b' + Date.now(), title: "Новый бой", photo1: "", photo2: "", link: "" }); renderBattles(); }
+    function addBattle() { appState.battles.push({ id: 'b' + Date.now(), title: "Новый бой", photo1: "", photo2: "", link: "", status: "active" }); renderBattles(); }
     function removeBattle(id) { appState.battles = appState.battles.filter(b => b.id !== id); renderBattles(); }
     function saveBattlesToState() {
         const blocks = document.querySelectorAll('#battlesAdminContainer .admin-match');
         appState.battles = Array.from(blocks).map((block, i) => ({
-            id: appState.battles[i].id, title: block.querySelector('.b-title').value,
-            photo1: block.querySelector('.b-p1').value, photo2: block.querySelector('.b-p2').value, link: block.querySelector('.b-link').value
+            id: appState.battles[i].id, 
+            status: block.querySelector('.b-status').value,
+            title: block.querySelector('.b-title').value,
+            photo1: block.querySelector('.b-p1').value, 
+            photo2: block.querySelector('.b-p2').value, 
+            link: block.querySelector('.b-link').value
         }));
     }
 
@@ -303,20 +396,27 @@
 
         appState.mode = document.getElementById('modeSelect').value;
         appState.heroStatus = document.getElementById('heroStatus').value;
-        const password = document.getElementById('adminPassword').value;
 
         const res = await fetch('/api/state', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password, newState: appState })
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+            },
+            body: JSON.stringify({ newState: appState })
         });
+
+        if (res.status === 401) {
+            alert("Сессия истекла! Выполните вход заново.");
+            return logout();
+        }
 
         const data = await res.json();
         if (data.success) alert("✅ Сохранено!");
         else alert("❌ Ошибка: " + data.error);
     }
 
-    loadData();
+// loadData() вызывается внутри showAdmin() после проверки токена
 </script>
 </body>
 </html>

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Турнирная сетка</title>
+    <style>
+        :root {
+            --bg: #0f172a; --surface: #1e293b; --accent: #3b82f6; 
+            --text: #f8fafc; --text-muted: #94a3b8; --winner: #22c55e;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
+        body { background: var(--bg); color: var(--text); padding: 40px 20px; }
+        
+        h1 { text-align: center; margin-bottom: 40px; }
+        .back-btn { display: inline-block; color: white; text-decoration: none; background: #334155; padding: 10px 20px; border-radius: 20px; margin-bottom: 20px; }
+        .back-btn:hover { background: #475569; }
+
+        /* Split Bracket Layout */
+        .split-bracket { display: flex; justify-content: center; gap: 30px; overflow-x: auto; padding-bottom: 40px; min-width: max-content; margin: 0 auto; cursor: grab; scroll-behavior: smooth; }
+        .split-bracket:active { cursor: grabbing; }
+        /* Прячем скроллбар для эстетики на десктопе/мобилках */
+        .split-bracket::-webkit-scrollbar { display: none; }
+        .split-bracket { -ms-overflow-style: none; scrollbar-width: none; }
+        .bracket-side { display: flex; gap: 30px; }
+        .bracket-col { display: flex; flex-direction: column; justify-content: space-around; width: 220px; gap: 15px; }
+        .bracket-center { display: flex; flex-direction: column; justify-content: center; width: 260px; margin: 0 10px; }
+        
+        .match { background: var(--surface); padding: 10px; border-radius: 8px; border: 1px solid #334155; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .match.final { border: 2px solid var(--accent); transform: scale(1.05); text-align: center; background: #1e293b; }
+        
+        .player { padding: 8px; margin: 4px 0; border-radius: 4px; background: #0f172a; font-size: 0.9em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .player.winner { border-left: 4px solid var(--winner); font-weight: bold; background: rgba(34, 197, 94, 0.1); animation: winnerHighlight 1s ease-out; }
+        /* Стили для кликабельных профилей */
+        .player-link { color: inherit; text-decoration: none; display: block; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .player-link:hover { color: var(--accent); text-decoration: underline; cursor: pointer; }
+
+        /* Animations */
+        @keyframes fadeInScale {
+            0% { opacity: 0; transform: scale(0.9); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes winnerHighlight {
+            0% { background: rgba(34, 197, 94, 0.5); transform: translateX(-5px); }
+            100% { background: rgba(34, 197, 94, 0.1); transform: translateX(0); }
+        }
+        .match { animation: fadeInScale 0.4s ease forwards; }
+    </style>
+    /* Highlight Path */
+        .player { transition: all 0.3s ease; }
+        .player.highlight-path {
+            background: rgba(59, 130, 246, 0.3) !important;
+            border-left: 4px solid var(--accent) !important;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+            z-index: 10;
+        }
+        .match.highlight-path-match {
+            border-color: var(--accent);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+        }
+</head>
+<body>
+
+<a href="/" class="back-btn">⬅ Назад к батлам</a>
+<h1>Турнирная сетка</h1>
+
+<div id="bracketContainer" style="text-align: center; color: var(--text-muted);">Загрузка...</div>
+
+<script>
+    let appState = null;
+    let lastStateHash = "";
+
+    async function loadData() {
+        try {
+            const res = await fetch('/api/state');
+            const state = await res.json();
+            const stateString = JSON.stringify(state);
+            
+            if (stateString === lastStateHash) return;
+            
+            lastStateHash = stateString;
+            localStorage.setItem('bracketCache', stateString);
+            appState = state;
+            renderBracket();
+        } catch (e) { console.error(e); }
+    }
+
+    const cached = localStorage.getItem('bracketCache');
+    if (cached) {
+        lastStateHash = cached;
+        appState = JSON.parse(cached);
+        renderBracket();
+    }
+
+    function getPlayerContent(id) {
+        if (!id) return "--- Ожидание ---";
+        const p = appState.participants.find(x => x.id === id);
+        if (!p) return "Неизвестно";
+        
+        const nameStr = `${p.emoji} ${p.name}`;
+        
+        // Если у игрока есть ссылка, оборачиваем в тег <a>
+        // draggable="false" нужен, чтобы свайп по сетке (drag-to-scroll) работал корректно
+        if (p.link) {
+            return `<a href="${p.link}" target="_blank" class="player-link" draggable="false">${nameStr}</a>`;
+        }
+        
+        return nameStr;
+    }
+
+    function createMatchHtml(matchData, isFinal = false) {
+        if(!matchData) return '';
+        const p1 = getPlayerContent(matchData.p1);
+        const p2 = getPlayerContent(matchData.p2);
+        const w1 = matchData.winner === matchData.p1 && matchData.p1 ? 'winner' : '';
+        const w2 = matchData.winner === matchData.p2 && matchData.p2 ? 'winner' : '';
+        
+        // Добавляем случайную задержку для эффекта "волны" при первичной загрузке
+        const delay = (Math.random() * 0.2).toFixed(2);
+        
+        // Добавляем ID игрока в дата-атрибуты для подсветки и обработчики наведения
+        const p1Id = matchData.p1 || 'null';
+        const p2Id = matchData.p2 || 'null';
+
+        return `
+            <div class="match ${isFinal ? 'final' : ''}" style="animation-delay: ${delay}s">
+                ${isFinal ? '<h3 style="color:#3b82f6; margin-bottom:10px;">👑 ФИНАЛ</h3>' : ''}
+                <div class="player ${w1} player-node-${p1Id}" 
+                     onmouseenter="highlightPath('${p1Id}')" onmouseleave="clearPath()">
+                    ${p1}
+                </div>
+                <div class="player ${w2} player-node-${p2Id}" 
+                     onmouseenter="highlightPath('${p2Id}')" onmouseleave="clearPath()">
+                    ${p2}
+                </div>
+            </div>
+        `;
+    }
+
+    function renderBracket() {
+        const container = document.getElementById('bracketContainer');
+        if (!appState.bracketMeta || !appState.bracketMeta.rounds) {
+            container.innerHTML = "Сетка еще не сформирована администратором.";
+            return;
+        }
+
+        const R = appState.bracketMeta.rounds;
+        
+        // Если участников всего 2 (сразу финал)
+        if (R === 1) {
+            container.innerHTML = `<div class="split-bracket"><div class="bracket-center">${createMatchHtml(appState.matches['r1_m1'], true)}</div></div>`;
+            return;
+        }
+
+        let html = '<div class="split-bracket">';
+
+        // --- ЛЕВОЕ КРЫЛО ---
+        html += '<div class="bracket-side" style="flex-direction: row;">';
+        for(let r = 1; r < R; r++) {
+            html += '<div class="bracket-col">';
+            const totalMatchesInRound = Math.pow(2, R - r);
+            const halfMatches = totalMatchesInRound / 2;
+            for(let m = 1; m <= halfMatches; m++) {
+                html += createMatchHtml(appState.matches[`r${r}_m${m}`]);
+            }
+            html += '</div>';
+        }
+        html += '</div>';
+
+        // --- ЦЕНТР (ФИНАЛ) ---
+        html += `<div class="bracket-center">${createMatchHtml(appState.matches[`r${R}_m1`], true)}</div>`;
+
+        // --- ПРАВОЕ КРЫЛО ---
+        html += '<div class="bracket-side" style="flex-direction: row-reverse;">'; // row-reverse разворачивает колонки к центру
+        for(let r = 1; r < R; r++) {
+            html += '<div class="bracket-col">';
+            const totalMatchesInRound = Math.pow(2, R - r);
+            const halfMatches = totalMatchesInRound / 2;
+            // Берем вторую половину матчей раунда
+            for(let m = halfMatches + 1; m <= totalMatchesInRound; m++) {
+                html += createMatchHtml(appState.matches[`r${r}_m${m}`]);
+            }
+            html += '</div>';
+        }
+        html += '</div>';
+
+        html += '</div>'; // Конец split-bracket
+        container.innerHTML = html;
+        setupDragToScroll(); // Инициализация свайпа после рендера
+    }
+
+    // Функции для подсветки пути
+    function highlightPath(playerId) {
+        if (!playerId || playerId === 'null') return;
+        
+        // Находим все узлы с этим игроком
+        const nodes = document.querySelectorAll(`.player-node-${playerId}`);
+        nodes.forEach(node => {
+            node.classList.add('highlight-path');
+            // Подсвечиваем родительский блок матча
+            node.closest('.match').classList.add('highlight-path-match');
+        });
+    }
+
+    function clearPath() {
+        document.querySelectorAll('.highlight-path').forEach(el => el.classList.remove('highlight-path'));
+        document.querySelectorAll('.highlight-path-match').forEach(el => el.classList.remove('highlight-path-match'));
+    }
+    
+    // Логика для скролла перетаскиванием (drag-to-scroll)
+    function setupDragToScroll() {
+        const slider = document.querySelector('.split-bracket');
+        if(!slider) return;
+
+        let isDown = false;
+        let startX;
+        let scrollLeft;
+
+        slider.addEventListener('mousedown', (e) => {
+            isDown = true;
+            startX = e.pageX - slider.offsetLeft;
+            scrollLeft = slider.scrollLeft;
+        });
+        slider.addEventListener('mouseleave', () => isDown = false);
+        slider.addEventListener('mouseup', () => isDown = false);
+        slider.addEventListener('mousemove', (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+            const x = e.pageX - slider.offsetLeft;
+            const walk = (x - startX) * 2; // Множитель скорости скролла
+            slider.scrollLeft = scrollLeft - walk;
+        });
+    }
+
+    loadData();
+    setInterval(loadData, 10000); // Автообновление
+</script>
+</body>
+</html>

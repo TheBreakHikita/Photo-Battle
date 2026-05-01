@@ -16,15 +16,6 @@
         /* Typography */
         h1, h2 { text-align: center; margin-bottom: 10px; }
         .status-badge { display: table; margin: 0 auto 40px; padding: 8px 16px; background: rgba(59, 130, 246, 0.2); color: var(--accent); border-radius: 20px; font-weight: bold; }
-
-        /* Dynamic Tournament Bracket */
-        .bracket-wrapper { display: flex; gap: 40px; margin-bottom: 60px; overflow-x: auto; padding-bottom: 20px; align-items: center; }
-        .bracket-col { display: flex; flex-direction: column; justify-content: space-around; min-width: 220px; gap: 15px; }
-        
-        .match { background: var(--surface); padding: 10px; border-radius: 8px; border: 1px solid #334155; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .match.final { border: 2px solid var(--accent); transform: scale(1.05); }
-        .player { padding: 8px; margin: 4px 0; border-radius: 4px; background: #0f172a; font-size: 0.9em; transition: 0.3s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .player.winner { border-left: 4px solid var(--winner); font-weight: bold; background: rgba(34, 197, 94, 0.1); }
         
         /* Active Battle */
         .battle-section { background: var(--surface); border-radius: 16px; padding: 40px 20px; text-align: center; margin-bottom: 60px; }
@@ -35,6 +26,18 @@
         
         .btn { display: inline-block; background: var(--accent); color: white; padding: 16px 40px; border-radius: 30px; text-decoration: none; font-weight: bold; font-size: 1.1em; transition: 0.2s; }
         .btn:hover { background: #2563eb; transform: translateY(-2px); }
+        /* Battle Status Badges */
+        .b-badge { display: inline-block; padding: 6px 12px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-top: 10px; margin-bottom: 10px; letter-spacing: 0.5px; }
+        .b-badge.active { background: rgba(34, 197, 94, 0.2); color: #4ade80; animation: pulse 2s infinite; }
+        .b-badge.finished { background: rgba(148, 163, 184, 0.2); color: #94a3b8; }
+        .btn.finished { background: #475569; }
+        .btn.finished:hover { background: #334155; }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
 
         /* Organizers */
         .organizers { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
@@ -49,9 +52,11 @@
     <h1>Фото Батл</h1>
     <div id="statusBadge" class="status-badge">Загрузка...</div>
 
-    <!-- Динамическая турнирная сетка -->
-    <div class="bracket-wrapper" id="dynamicBracket">
-        <!-- Сюда алгоритм вставит любое количество колонок -->
+    <!-- Кнопка перехода к сетке -->
+    <div style="text-align: center; margin-bottom: 50px;">
+        <a href="/bracket.html" class="btn" style="background: #8b5cf6; font-size: 1.2em; padding: 20px 50px; box-shadow: 0 10px 20px rgba(139, 92, 246, 0.4);">
+            🏆 Посмотреть турнирную сетку
+        </a>
     </div>
 
     <!-- Контейнер для всех боев -->
@@ -65,10 +70,28 @@
 </div>
 
 <script>
+    let lastStateHash = "";
+
     async function loadData() {
-        const res = await fetch('/api/state');
-        const state = await res.json();
-        render(state);
+        try {
+            const res = await fetch('/api/state');
+            const state = await res.json();
+            const stateString = JSON.stringify(state);
+            
+            // Если состояние не изменилось, ничего не перерисовываем
+            if (stateString === lastStateHash) return;
+            
+            lastStateHash = stateString;
+            localStorage.setItem('battleCache', stateString); // Сохраняем для мгновенной загрузки в след. раз
+            render(state);
+        } catch (e) { console.error("Ошибка обновления данных", e); }
+    }
+
+    // Мгновенная загрузка из кэша
+    const cached = localStorage.getItem('battleCache');
+    if (cached) {
+        lastStateHash = cached;
+        render(JSON.parse(cached));
     }
 
     function getPlayerContent(id, state) {
@@ -85,56 +108,28 @@
             document.getElementById('statusBadge').style.color = 'white';
         }
 
-        // Алгоритмический рендер сетки
-        const bracket = document.getElementById('dynamicBracket');
-        bracket.innerHTML = '';
-        
-        if(state.bracketMeta && state.bracketMeta.rounds) {
-            for(let r = 1; r <= state.bracketMeta.rounds; r++) {
-                const col = document.createElement('div');
-                col.className = 'bracket-col';
-                // Заголовок колонки
-                if (r === state.bracketMeta.rounds) col.innerHTML = '<h3 style="text-align:center; color: var(--accent);">ФИНАЛ</h3>';
-                else col.innerHTML = `<h3 style="text-align:center; color: var(--text-muted);">Раунд ${r}</h3>`;
-
-                const matchCount = state.bracketMeta.totalSlots / Math.pow(2, r);
-                for(let m = 1; m <= matchCount; m++) {
-                    const matchData = state.matches[`r${r}_m${m}`];
-                    if(!matchData) continue;
-
-                    const p1Content = getPlayerContent(matchData.p1, state);
-                    const p2Content = getPlayerContent(matchData.p2, state);
-                    
-                    const mDiv = document.createElement('div');
-                    mDiv.className = 'match';
-                    if(r === state.bracketMeta.rounds) mDiv.classList.add('final');
-                    
-                    mDiv.innerHTML = `
-                        <div class="player ${matchData.winner === matchData.p1 && matchData.p1 ? 'winner' : ''}">${p1Content}</div>
-                        <div class="player ${matchData.winner === matchData.p2 && matchData.p2 ? 'winner' : ''}">${p2Content}</div>
-                    `;
-                    col.appendChild(mDiv);
-                }
-                bracket.appendChild(col);
-            }
-        } else {
-            bracket.innerHTML = '<div style="width:100%; text-align:center; color: #666;">Сетка формируется...</div>';
-        }
-
         // Рендер боев (теперь их может быть несколько)
         const battlesContainer = document.getElementById('battlesContainer');
         battlesContainer.innerHTML = '';
         if (state.battles && state.battles.length > 0) {
             state.battles.forEach(battle => {
+                const isActive = !battle.status || battle.status === 'active';
+                const badgeHtml = isActive 
+                    ? `<div class="b-badge active">🔥 ИДЕТ ГОЛОСОВАНИЕ</div>`
+                    : `<div class="b-badge finished">🏁 ПОБЕДИТЕЛЬ ВЫБРАН</div>`;
+                const btnText = isActive ? 'Перейти к посту и проголосовать' : 'Посмотреть результаты';
+                const btnClass = isActive ? 'btn' : 'btn finished';
+
                 battlesContainer.innerHTML += `
                 <section class="battle-section">
                     <h2>${battle.title}</h2>
+                    ${badgeHtml}
                     <div class="photos">
                         <div class="photo-wrapper"><img src="${battle.photo1}" alt="1"></div>
                         <div class="vs">VS</div>
                         <div class="photo-wrapper"><img src="${battle.photo2}" alt="2"></div>
                     </div>
-                    <a href="${battle.link}" class="btn" target="_blank">Перейти к посту и проголосовать</a>
+                    <a href="${battle.link}" class="${btnClass}" target="_blank">${btnText}</a>
                 </section>`;
             });
         }
