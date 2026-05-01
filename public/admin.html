@@ -44,10 +44,11 @@
         <input type="text" id="heroStatus">
     </div>
 
-    <h2>2. Участники (Drag & Drop)</h2>
-    <p style="font-size: 0.8em; color: #666;">Первые 8 участников попадают в сетку. Остальные — в резерве.</p>
+    <h2>2. Участники (Списком)</h2>
+    <p style="font-size: 0.8em; color: #666;">Добавьте сколько угодно участников. После завершения списка нажмите "Сгенерировать сетку".</p>
     <button class="btn" onclick="addParticipant()" style="background: #10b981; width: auto; margin-bottom: 10px;">➕ Добавить участника</button>
     <ul id="participantsList"></ul>
+    <button class="btn" onclick="generateBracket()" style="background: #8b5cf6; margin-top: 15px;">⚡ Сгенерировать турнирную сетку</button>
 
     <h2>3. Управление боями (Выбор победителей)</h2>
     <div id="bracketControls"></div>
@@ -72,17 +73,12 @@
 <script>
     let appState = null;
 
-    const bracketLogic = {
-        q1: { nextMatch: 's1', slot: 'p1' }, q2: { nextMatch: 's1', slot: 'p2' },
-        q3: { nextMatch: 's2', slot: 'p1' }, q4: { nextMatch: 's2', slot: 'p2' },
-        s1: { nextMatch: 'f1', slot: 'p1' }, s2: { nextMatch: 'f1', slot: 'p2' }
-    };
-
     async function loadData() {
         const res = await fetch('/api/state');
         appState = await res.json();
-        if(!appState.battles) appState.battles = []; // Защита от старых данных
+        if(!appState.battles) appState.battles = []; 
         if(!appState.organizers) appState.organizers = [];
+        if(!appState.matches) appState.matches = {};
         renderAdmin();
     }
 
@@ -104,10 +100,9 @@
             const li = document.createElement('li');
             li.className = 'participant-item';
             li.dataset.id = p.id;
-            // Первые 8 подсвечиваем, остальные прозрачные
-            if(index >= 8) li.style.opacity = '0.5'; 
             li.innerHTML = `
                 <span style="cursor: grab; font-size: 1.2em; padding: 0 10px;">↕️</span>
+                <span style="font-weight:bold; color:#888; width: 30px;">#${index+1}</span>
                 <input type="text" value="${p.emoji}" class="p-emoji" style="width: 50px;" placeholder="Смайл">
                 <input type="text" value="${p.name}" class="p-name" placeholder="Никнейм">
                 <button onclick="removeParticipant('${p.id}')" style="background: #ef4444; color: white; border: none; padding: 10px; margin-left: 10px; border-radius: 5px; cursor:pointer;">❌</button>
@@ -115,44 +110,132 @@
             list.appendChild(li);
         });
 
-        new Sortable(list, { animation: 150, onEnd: updatePairsFromDrag });
+        // Drag and Drop ТОЛЬКО переставляет массив, сетку не трогает!
+        new Sortable(list, { animation: 150, onEnd: updateParticipantsArray });
     }
 
     function addParticipant() {
-        const newId = 'p' + Date.now();
-        appState.participants.push({ id: newId, emoji: '👤', name: 'Новый участник' });
-        updatePairsFromDrag();
-        renderAdmin();
+        appState.participants.push({ id: 'p' + Date.now(), emoji: '👤', name: 'Новый участник' });
+        renderParticipants();
     }
 
     function removeParticipant(id) {
         if(!confirm('Удалить участника?')) return;
         appState.participants = appState.participants.filter(p => p.id !== id);
-        updatePairsFromDrag();
-        renderAdmin();
+        renderParticipants();
     }
 
-    function updatePairsFromDrag() {
+    function updateParticipantsArray() {
         const items = document.querySelectorAll('.participant-item');
         appState.participants = Array.from(items).map(item => ({
             id: item.dataset.id,
             emoji: item.querySelector('.p-emoji').value,
             name: item.querySelector('.p-name').value
         }));
+    }
 
-        // Безопасное обновление сетки (берем первых 8)
-        const getP = (index) => appState.participants[index] ? appState.participants[index].id : null;
-        
-        appState.matches.q1.p1 = getP(0); appState.matches.q1.p2 = getP(1);
-        appState.matches.q2.p1 = getP(2); appState.matches.q2.p2 = getP(3);
-        appState.matches.q3.p1 = getP(4); appState.matches.q3.p2 = getP(5);
-        appState.matches.q4.p1 = getP(6); appState.matches.q4.p2 = getP(7);
+    // --- АЛГОРИТМ ГЕНЕРАЦИИ СЕТКИ (НА ЛЮБОЕ КОЛ-ВО УЧАСТНИКОВ) ---
+    function generateBracket() {
+        updateParticipantsArray();
+        const pCount = appState.participants.length;
+        if(pCount < 2) return alert("Добавьте минимум 2 участника!");
+        if(!confirm("Внимание! Это создаст новую сетку и сбросит все прошлые результаты. Продолжить?")) return;
 
-        renderParticipants(); // Обновляем прозрачность запасных
+        // Ищем ближайшую степень двойки (2, 4, 8, 16, 32, 64, 128...)
+        let power = 2;
+        while(power < pCount) power *= 2;
+        const totalRounds = Math.log2(power);
+
+        appState.matches = {};
+        appState.bracketMeta = { rounds: totalRounds, totalSlots: power };
+
+        // Создаем пустые матчи
+        for(let r = 1; r <= totalRounds; r++) {
+            const matchCount = power / Math.pow(2, r);
+            for(let m = 1; m <= matchCount; m++) {
+                appState.matches[`r${r}_m${m}`] = { p1: null, p2: null, winner: null };
+            }
+        }
+
+        // Заполняем 1 раунд из списка участников
+        let pIndex = 0;
+        const r1Matches = power / 2;
+        for(let m = 1; m <= r1Matches; m++) {
+            appState.matches[`r1_m${m}`].p1 = appState.participants[pIndex] ? appState.participants[pIndex].id : null;
+            pIndex++;
+            appState.matches[`r1_m${m}`].p2 = appState.participants[pIndex] ? appState.participants[pIndex].id : null;
+            pIndex++;
+
+            // Если у кого-то нет пары (нечетное количество) - он автоматически проходит дальше
+            if(appState.matches[`r1_m${m}`].p1 && !appState.matches[`r1_m${m}`].p2) {
+                appState.matches[`r1_m${m}`].winner = appState.matches[`r1_m${m}`].p1;
+                advancePlayer(1, m, appState.matches[`r1_m${m}`].p1);
+            }
+        }
+
+        renderBracketControls();
+        alert("Сетка построена! Сохраните изменения.");
+    }
+
+    function getPlayerName(id) {
+        if (!id) return "---";
+        const p = appState.participants.find(x => x.id === id);
+        return p ? `${p.emoji} ${p.name}` : "Неизвестно";
+    }
+
+    function renderBracketControls() {
+        const container = document.getElementById('bracketControls');
+        container.innerHTML = '';
+        if(!appState.bracketMeta) return container.innerHTML = '<i>Сетка не сгенерирована</i>';
+
+        for(let r = 1; r <= appState.bracketMeta.rounds; r++) {
+            const matchCount = appState.bracketMeta.totalSlots / Math.pow(2, r);
+            container.innerHTML += `<h3 style="color:#3b82f6; margin-top:20px;">Раунд ${r}</h3>`;
+            
+            for(let m = 1; m <= matchCount; m++) {
+                const matchData = appState.matches[`r${r}_m${m}`];
+                if(!matchData || (!matchData.p1 && !matchData.p2)) continue; // Пропускаем пустые
+
+                const div = document.createElement('div');
+                div.className = 'admin-match';
+                
+                // Если автопроход
+                if(matchData.p1 && !matchData.p2) {
+                    div.innerHTML = `<strong>Бой #${m}:</strong> ${getPlayerName(matchData.p1)} (Автопроход)`;
+                } else {
+                    div.innerHTML = `
+                        <strong>Бой #${m}:</strong> 
+                        <button class="winner-btn ${matchData.winner === matchData.p1 && matchData.p1 ? 'active' : ''}" 
+                                onclick="setWinner(${r}, ${m}, '${matchData.p1}')" ${!matchData.p1 ? 'disabled' : ''}>Победа: ${getPlayerName(matchData.p1)}</button>
+                        <button class="winner-btn ${matchData.winner === matchData.p2 && matchData.p2 ? 'active' : ''}" 
+                                onclick="setWinner(${r}, ${m}, '${matchData.p2}')" ${!matchData.p2 ? 'disabled' : ''}>Победа: ${getPlayerName(matchData.p2)}</button>
+                    `;
+                }
+                container.appendChild(div);
+            }
+        }
+    }
+
+    // --- ПЕРЕДВИЖЕНИЕ ПОБЕДИТЕЛЕЙ ПО СЕТКЕ ---
+    function setWinner(round, matchNum, playerId) {
+        if (!playerId || playerId === 'null') return;
+        appState.matches[`r${round}_m${matchNum}`].winner = playerId;
+        advancePlayer(round, matchNum, playerId);
         renderBracketControls();
     }
 
-    // --- БОИ ---
+    function advancePlayer(currentRound, currentMatch, playerId) {
+        const nextRound = currentRound + 1;
+        if (nextRound > appState.bracketMeta.rounds) return; // Турнир выигран!
+
+        const nextMatch = Math.ceil(currentMatch / 2);
+        const slot = (currentMatch % 2 === 1) ? 'p1' : 'p2'; // Нечетные идут наверх(p1), четные вниз(p2)
+        
+        appState.matches[`r${nextRound}_m${nextMatch}`][slot] = playerId;
+        appState.matches[`r${nextRound}_m${nextMatch}`].winner = null; // Сброс победителя след. матча
+    }
+
+    // --- ОСТАЛЬНЫЕ ФУНКЦИИ (Бои, Организаторы, Сохранение) ---
     function renderBattles() {
         const container = document.getElementById('battlesAdminContainer');
         container.innerHTML = '';
@@ -171,30 +254,16 @@
         });
     }
 
-    function addBattle() {
-        appState.battles.push({
-            id: 'b' + Date.now(), title: "Новый бой", photo1: "", photo2: "", link: ""
-        });
-        renderBattles();
-    }
-
-    function removeBattle(id) {
-        appState.battles = appState.battles.filter(b => b.id !== id);
-        renderBattles();
-    }
-
+    function addBattle() { appState.battles.push({ id: 'b' + Date.now(), title: "Новый бой", photo1: "", photo2: "", link: "" }); renderBattles(); }
+    function removeBattle(id) { appState.battles = appState.battles.filter(b => b.id !== id); renderBattles(); }
     function saveBattlesToState() {
-        const battleBlocks = document.querySelectorAll('#battlesAdminContainer .admin-match');
-        appState.battles = Array.from(battleBlocks).map((block, index) => ({
-            id: appState.battles[index].id,
-            title: block.querySelector('.b-title').value,
-            photo1: block.querySelector('.b-p1').value,
-            photo2: block.querySelector('.b-p2').value,
-            link: block.querySelector('.b-link').value
+        const blocks = document.querySelectorAll('#battlesAdminContainer .admin-match');
+        appState.battles = Array.from(blocks).map((block, i) => ({
+            id: appState.battles[i].id, title: block.querySelector('.b-title').value,
+            photo1: block.querySelector('.b-p1').value, photo2: block.querySelector('.b-p2').value, link: block.querySelector('.b-link').value
         }));
     }
 
-    // --- ОРГАНИЗАТОРЫ ---
     function renderOrganizers() {
         const container = document.getElementById('organizersAdminContainer');
         container.innerHTML = '';
@@ -204,71 +273,31 @@
                 <strong>Организатор ${index + 1}</strong>
                 <div style="display:flex; gap:10px; margin-top:5px;">
                     <input type="text" class="o-emoji" value="${org.emoji}" style="width: 60px;" placeholder="Смайл">
-                    <input type="text" class="o-role" value="${org.role}" placeholder="Роль (напр. Ведущий)">
+                    <input type="text" class="o-role" value="${org.role}" placeholder="Роль">
                 </div>
                 <input type="text" class="o-name" value="${org.name}" placeholder="Ник (@name)" style="margin-top:5px;">
-                <input type="text" class="o-link" value="${org.link}" placeholder="Ссылка на профиль (https://...)" style="margin-top:5px;">
+                <input type="text" class="o-link" value="${org.link}" placeholder="Ссылка на профиль" style="margin-top:5px;">
             </div>`;
         });
     }
-
     function saveOrganizersToState() {
         const blocks = document.querySelectorAll('#organizersAdminContainer .admin-match');
-        appState.organizers = Array.from(blocks).map((block) => ({
-            emoji: block.querySelector('.o-emoji').value,
-            role: block.querySelector('.o-role').value,
-            name: block.querySelector('.o-name').value,
-            link: block.querySelector('.o-link').value
+        appState.organizers = Array.from(blocks).map(block => ({
+            emoji: block.querySelector('.o-emoji').value, role: block.querySelector('.o-role').value,
+            name: block.querySelector('.o-name').value, link: block.querySelector('.o-link').value
         }));
     }
 
-    // --- СЕТКА И СОХРАНЕНИЕ ---
-    function getPlayerName(id) {
-        if (!id) return "Нет участника";
-        const p = appState.participants.find(x => x.id === id);
-        return p ? `${p.emoji} ${p.name}` : "Неизвестно";
-    }
-
-    function renderBracketControls() {
-        const container = document.getElementById('bracketControls');
-        container.innerHTML = '';
-        Object.keys(appState.matches).forEach(matchId => {
-            const m = appState.matches[matchId];
-            const div = document.createElement('div');
-            div.className = 'admin-match';
-            div.innerHTML = `
-                <strong>Матч ${matchId.toUpperCase()}:</strong> 
-                <button class="winner-btn ${m.winner === m.p1 && m.p1 ? 'active' : ''}" 
-                        onclick="setWinner('${matchId}', '${m.p1}')" ${!m.p1 ? 'disabled' : ''}>Победа: ${getPlayerName(m.p1)}</button>
-                <button class="winner-btn ${m.winner === m.p2 && m.p2 ? 'active' : ''}" 
-                        onclick="setWinner('${matchId}', '${m.p2}')" ${!m.p2 ? 'disabled' : ''}>Победа: ${getPlayerName(m.p2)}</button>
-            `;
-            container.appendChild(div);
-        });
-    }
-
-    function setWinner(matchId, playerId) {
-        if (!playerId || playerId === 'null') return;
-        appState.matches[matchId].winner = playerId;
-        const logic = bracketLogic[matchId];
-        if (logic) {
-            appState.matches[logic.nextMatch][logic.slot] = playerId;
-            appState.matches[logic.nextMatch].winner = null; 
-        }
-        renderBracketControls();
-    }
-
     function resetTournament() {
-        if(!confirm("Очистить сетку?")) return;
-        Object.keys(appState.matches).forEach(key => appState.matches[key].winner = null);
-        appState.matches.s1.p1 = appState.matches.s1.p2 = null;
-        appState.matches.s2.p1 = appState.matches.s2.p2 = null;
-        appState.matches.f1.p1 = appState.matches.f1.p2 = null;
+        if(!confirm("Удалить ВСЕХ участников и сетку?")) return;
+        appState.participants = [];
+        appState.matches = {};
+        appState.bracketMeta = null;
         renderAdmin();
     }
 
     async function saveState() {
-        updatePairsFromDrag(); 
+        updateParticipantsArray(); 
         saveBattlesToState();
         saveOrganizersToState();
 
