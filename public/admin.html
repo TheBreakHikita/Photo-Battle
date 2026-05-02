@@ -37,6 +37,12 @@
         .flex-buttons .btn { margin-top: 0; flex: 1; min-width: 200px; }
         .btn-outline { background: transparent; border: 2px solid #3b82f6; color: #3b82f6; }
         .btn-outline:hover { background: #eff6ff; }
+        /* Стили для аналитики */
+        .analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px; margin-bottom: 20px; }
+        .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .stat-card h4 { margin: 0 0 5px 0; color: #64748b; font-size: 0.9em; }
+        .stat-card .value { font-size: 1.8em; font-weight: bold; color: #3b82f6; margin: 0; }
+        .stat-card.total .value { color: #10b981; }
 
         /* Mobile Adaptation */
         @media (max-width: 600px) {
@@ -62,6 +68,26 @@
     <div style="display: flex; justify-content: space-between; align-items: center;">
         <h1>⚙️ Управление Турниром</h1>
         <button class="btn btn-danger" style="width: auto; padding: 8px 15px;" onclick="logout()">Выйти</button>
+    </div>
+
+    <!-- Блок Аналитики -->
+    <div class="analytics-grid">
+        <div class="stat-card total">
+            <h4>Всего просмотров</h4>
+            <p class="value" id="statTotal">0</p>
+        </div>
+        <div class="stat-card">
+            <h4>Главная (Батлы)</h4>
+            <p class="value" id="statIndex">0</p>
+        </div>
+        <div class="stat-card">
+            <h4>Сетка (Турнир)</h4>
+            <p class="value" id="statBracket">0</p>
+        </div>
+        <div class="stat-card">
+            <h4>Информация</h4>
+            <p class="value" id="statInfo">0</p>
+        </div>
     </div>
 
     <!-- Блок бэкапов -->
@@ -190,6 +216,10 @@
         // Миграция старого формата данных в новый
         if (!appState.eventInfo.blocks) {
             appState.eventInfo.blocks = [];
+            // Инициализация аналитики, если ее еще нет
+        if(!appState.analytics) {
+            appState.analytics = { index: 0, bracket: 0, info: 0, total: 0 };
+        }
             if (appState.eventInfo.title || appState.eventInfo.description) {
                 appState.eventInfo.blocks.push({
                     id: 'ib' + Date.now(),
@@ -207,6 +237,11 @@
         document.getElementById('heroStatus').value = appState.heroStatus;
         document.getElementById('infoBtnText').value = appState.eventInfo.buttonText || '';
         document.getElementById('infoBtnLink').value = appState.eventInfo.buttonLink || '';
+        // Отрисовка статистики
+        document.getElementById('statTotal').innerText = appState.analytics.total || 0;
+        document.getElementById('statIndex').innerText = appState.analytics.index || 0;
+        document.getElementById('statBracket').innerText = appState.analytics.bracket || 0;
+        document.getElementById('statInfo').innerText = appState.analytics.info || 0;
         
         renderParticipants();
         renderBracketControls();

@@ -481,6 +481,12 @@
 
     loadData();
     setInterval(loadData, 10000); // Автообновление
+    // Учет просмотра страницы
+    if (!sessionStorage.getItem('tracked_bracket')) {
+        fetch('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ page: 'bracket' }) })
+            .then(() => sessionStorage.setItem('tracked_bracket', 'true'))
+            .catch(e => console.error('Analytics error:', e));
+    }
 </script>
 </body>
 </html>

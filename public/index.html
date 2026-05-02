@@ -164,6 +164,12 @@
 
     loadData();
     setInterval(loadData, 10000); // Автообновление каждые 10 сек (на случай долгого открытого окна)
+    // Учет просмотра страницы
+    if (!sessionStorage.getItem('tracked_index')) {
+        fetch('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ page: 'index' }) })
+            .then(() => sessionStorage.setItem('tracked_index', 'true'))
+            .catch(e => console.error('Analytics error:', e));
+    }
 </script>
 </body>
 </html>

@@ -18,6 +18,28 @@ app.get('/api/state', async (req, res) => {
     res.json(data.data);
 });
 
+// Учет статистики посещений
+app.post('/api/track', async (req, res) => {
+    const { page } = req.body;
+    if (!page) return res.status(400).json({ error: 'Page is required' });
+
+    try {
+        const { data, error } = await supabase.from('app_state').select('data').eq('id', 1).single();
+        if (error) throw error;
+
+        let state = data.data;
+        if (!state.analytics) state.analytics = { index: 0, bracket: 0, info: 0, total: 0 };
+
+        state.analytics[page] = (state.analytics[page] || 0) + 1;
+        state.analytics.total = (state.analytics.total || 0) + 1;
+
+        await supabase.from('app_state').update({ data: state }).eq('id', 1);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Авторизация админа
 app.post('/api/login', (req, res) => {
     if (req.body.password === ADMIN_PASSWORD) {
@@ -35,6 +57,13 @@ app.post('/api/state', async (req, res) => {
     if (!token || !authTokens.has(token)) return res.status(401).json({ error: "Не авторизован" });
 
     const { newState } = req.body;
+    
+    // Подтягиваем актуальную статистику из базы, чтобы админ случайно не перезаписал (не обнулил) её старыми данными
+    const { data: currentState } = await supabase.from('app_state').select('data').eq('id', 1).single();
+    if (currentState && currentState.data && currentState.data.analytics) {
+        newState.analytics = currentState.data.analytics;
+    }
+
     const { error } = await supabase.from('app_state').update({ data: newState }).eq('id', 1);
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
