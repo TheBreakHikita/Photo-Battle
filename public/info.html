@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Информация об ивенте</title>
-    <link rel="icon" href="data:,">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23fbbf24'/></svg>">
     <style>
         :root {
             --bg: #0f172a; --surface: #1e293b; --accent: #3b82f6; 
@@ -26,8 +26,11 @@
         .info-header .arrow { transition: transform 0.3s ease; font-size: 0.9em; color: var(--accent); }
         .info-block.expanded .info-header .arrow { transform: rotate(180deg); }
         
-        .info-content { max-height: 0; overflow: hidden; transition: max-height 0.4s ease, padding 0.4s ease; background: var(--surface); }
-        .info-block.expanded .info-content { max-height: 2000px; padding: 20px; }
+        /* Умное снятие ограничения высоты через CSS Grid */
+        .info-content-wrapper { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.4s ease; background: var(--surface); }
+        .info-block.expanded .info-content-wrapper { grid-template-rows: 1fr; }
+        .info-content { min-height: 0; overflow: hidden; padding: 0 20px; transition: padding 0.4s ease; cursor: pointer; }
+        .info-block.expanded .info-content { padding: 20px; }
         
         .description-text { font-size: 1.1em; color: var(--text); white-space: pre-wrap; line-height: 1.6; }
 
@@ -111,8 +114,10 @@
                         <span>${block.title}</span>
                         <span class="arrow">▼</span>
                     </div>
-                    <div class="info-content">
-                        <div class="description-text">${block.description}</div>
+                    <div class="info-content-wrapper">
+                        <div class="info-content" onclick="toggleBlock(this)" title="Нажмите, чтобы свернуть">
+                            <div class="description-text">${block.description}</div>
+                        </div>
                     </div>
                 </div>
             `;
