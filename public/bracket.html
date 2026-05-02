@@ -29,6 +29,28 @@
         .view-switcher { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-bottom: 30px; }
         .view-btn { background: var(--surface); border: 1px solid #334155; color: var(--text); padding: 8px 16px; border-radius: 20px; cursor: pointer; transition: 0.2s; font-size: 0.9em; }
         .view-btn.active { background: var(--accent); border-color: var(--accent); font-weight: bold; }
+        /* Content mode switcher */
+        .content-switcher { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-bottom: 30px; }
+        
+        /* Compact Mode Overrides */
+        #bracketContainer.compact-mode .bracket-col { width: auto; min-width: 80px; }
+        #bracketContainer.compact-mode .bracket-center { width: auto; min-width: 100px; }
+        #bracketContainer.compact-mode .player { justify-content: center; }
+        #bracketContainer.compact-mode .player-name { text-align: center; }
+        /* Сжатие отступов и размеров в компактном режиме (Вертикальное и Горизонтальное) */
+        #bracketContainer.compact-mode .zoom-wrapper { gap: 15px !important; }
+        #bracketContainer.compact-mode .bracket-side { gap: 15px; }
+        #bracketContainer.compact-mode .bracket-col { gap: 5px; }
+        #bracketContainer.compact-mode .match { padding: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border-width: 1px; }
+        #bracketContainer.compact-mode .match.final { border-width: 2px; padding: 6px; }
+        #bracketContainer.compact-mode .player { padding: 3px 6px; margin: 2px 0; font-size: 0.85em; }
+        #bracketContainer.compact-mode .player-name { font-size: 1.3em; line-height: 1; }
+        #bracketContainer.compact-mode .profile-btn { padding: 2px 4px; font-size: 0.7em; }
+
+        /* Стили панели Zoom UI */
+        .zoom-controls { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 20px; }
+        .zoom-controls .view-btn { padding: 5px 12px; font-weight: bold; }
+        .zoom-controls #zoomDisplay { pointer-events: none; background: transparent; border: none; min-width: 60px; color: var(--accent); }
         
         /* List Bracket (Списком для мобилок) */
         .list-bracket { display: flex; flex-direction: column; gap: 30px; max-width: 600px; margin: 0 auto; text-align: left; }
@@ -97,6 +119,19 @@
     <button class="view-btn" onclick="setViewMode('list')">📱 Списком</button>
 </div>
 
+<!-- Переключатель контента (Имя + Смайл / Только Смайл) -->
+<div class="content-switcher" id="contentSwitcher" style="display: none;">
+    <button class="view-btn content-btn active" onclick="setContentMode('full')">Полный вид</button>
+    <button class="view-btn content-btn" onclick="setContentMode('compact')">Только смайлы</button>
+</div>
+
+<!-- Управление масштабом (Zoom) -->
+<div class="zoom-controls" id="zoomControls" style="display: none;">
+    <button class="view-btn" onclick="changeZoom(-0.1)" title="Отдалить">➖</button>
+    <button class="view-btn" id="zoomDisplay">100%</button>
+    <button class="view-btn" onclick="changeZoom(0.1)" title="Приблизить">➕</button>
+</div>
+
 <div style="text-align: center;">
     <div class="hint-text">💡 <b>Подсказка:</b> наведите курсор (или нажмите) на участника, чтобы подсветить его путь в турнире</div>
 </div>
@@ -109,6 +144,31 @@
     // Загружаем сохраненный режим отображения. Для мобилок по умолчанию ставим "list"
     let currentViewMode = localStorage.getItem('bracketViewMode') || (window.innerWidth < 768 ? 'list' : 'split');
 
+    let currentContentMode = localStorage.getItem('bracketContentMode') || 'full';
+
+    function setContentMode(mode) {
+        currentContentMode = mode;
+        localStorage.setItem('bracketContentMode', mode);
+        renderBracket();
+    }
+
+    let currentZoom = 1;
+
+    function changeZoom(delta) {
+        currentZoom += delta;
+        if (currentZoom < 0.2) currentZoom = 0.2; // Максимальное отдаление 20%
+        if (currentZoom > 2.5) currentZoom = 2.5; // Максимальное приближение 250%
+        
+        const wrapper = document.getElementById('zoomWrapper');
+        if (wrapper) {
+            wrapper.style.transform = `scale(${currentZoom})`;
+            setTimeout(drawLines, 50); // Перерисовываем линии под новый масштаб
+        }
+        
+        const display = document.getElementById('zoomDisplay');
+        if (display) display.innerText = Math.round(currentZoom * 100) + '%';
+    }
+    
     function setViewMode(mode) {
         currentViewMode = mode;
         localStorage.setItem('bracketViewMode', mode);
@@ -144,7 +204,9 @@
         const p = appState.participants.find(x => x.id === id);
         if (!p) return '<span class="player-name">Неизвестно</span>';
         
-        const nameStr = `${p.emoji} ${p.name}`;
+        // Если компактный режим - показываем только смайл, иначе смайл + имя
+        const nameStr = currentContentMode === 'compact' ? p.emoji : `${p.emoji} ${p.name}`;
+        // В title всегда оставляем полное имя для подсказки при наведении
         let html = `<span class="player-name" title="${p.name}">${nameStr}</span>`;
         
         // Если у игрока есть ссылка, добавляем маленькую кнопку профиля
@@ -195,7 +257,24 @@
         }
 
         switcher.style.display = 'flex';
-        document.querySelectorAll('.view-btn').forEach(btn => {
+        document.getElementById('contentSwitcher').style.display = 'flex';
+        
+        const zoomCtrls = document.getElementById('zoomControls');
+        if (zoomCtrls) zoomCtrls.style.display = currentViewMode === 'list' ? 'none' : 'flex';
+        
+        // Обновляем текст текущего масштаба
+        const display = document.getElementById('zoomDisplay');
+        if (display) display.innerText = Math.round(currentZoom * 100) + '%';
+
+        // Устанавливаем класс для компактного режима
+        if (currentContentMode === 'compact') {
+            container.classList.add('compact-mode');
+        } else {
+            container.classList.remove('compact-mode');
+        }
+
+        // Обновляем активные кнопки макета
+        document.querySelectorAll('#viewSwitcher .view-btn').forEach(btn => {
             btn.classList.remove('active');
             if((btn.innerText.includes('двух') && currentViewMode === 'split') ||
                (btn.innerText.includes('Слева') && currentViewMode === 'linear') ||
@@ -204,6 +283,15 @@
             }
         });
 
+        // Обновляем активные кнопки контента
+        document.querySelectorAll('.content-btn').forEach(btn => {
+            btn.classList.remove('active');
+            if((btn.innerText.includes('Полный') && currentContentMode === 'full') ||
+               (btn.innerText.includes('смайлы') && currentContentMode === 'compact')) {
+                btn.classList.add('active');
+            }
+        });
+        
         const R = appState.bracketMeta.rounds;
         let html = '';
 
@@ -223,6 +311,7 @@
 
         } else if (currentViewMode === 'linear') {
             html += '<div class="split-bracket" style="justify-content: flex-start;">';
+            html += `<div id="zoomWrapper" class="zoom-wrapper" style="display: flex; gap: 30px; position: relative; transform: scale(${currentZoom}); transform-origin: top left; transition: transform 0.2s ease; width: max-content; padding-right: 50px;">`;
             html += '<svg id="bracketLines" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;"></svg>';
             for(let r = 1; r <= R; r++) {
                 html += '<div class="bracket-col">';
@@ -232,13 +321,14 @@
                 }
                 html += '</div>';
             }
-            html += '</div>';
+            html += '</div></div>';
 
         } else {
             if (R === 1) {
-                html += `<div class="split-bracket"><div class="bracket-center">${createMatchHtml(appState.matches['r1_m1'], 1, 1, true)}</div></div>`;
+                html += `<div class="split-bracket"><div id="zoomWrapper" class="zoom-wrapper" style="transform: scale(${currentZoom}); transform-origin: top center; transition: transform 0.2s ease;"><div class="bracket-center">${createMatchHtml(appState.matches['r1_m1'], 1, 1, true)}</div></div></div>`;
             } else {
                 html += '<div class="split-bracket">';
+                html += `<div id="zoomWrapper" class="zoom-wrapper" style="display: flex; gap: 30px; position: relative; transform: scale(${currentZoom}); transform-origin: top center; transition: transform 0.2s ease; width: max-content; padding: 10px 40px;">`;
                 html += '<svg id="bracketLines" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;"></svg>';
                 
                 html += '<div class="bracket-side" style="flex-direction: row;">';
@@ -264,7 +354,7 @@
                     html += '</div>';
                 }
                 html += '</div>';
-                html += '</div>';
+                html += '</div></div>';
             }
         }
 
@@ -318,30 +408,29 @@
                     const rect1 = el1.getBoundingClientRect();
                     const rect2 = el2.getBoundingClientRect();
                     
-                    // Координаты относительно контейнера SVG
-                    let y1 = (rect1.top + rect1.height / 2) - svgRect.top;
-                    let y2 = (rect2.top + rect2.height / 2) - svgRect.top;
+                    // Координаты относительно контейнера SVG с поправкой на текущий масштаб (currentZoom)
+                    let y1 = ((rect1.top + rect1.height / 2) - svgRect.top) / currentZoom;
+                    let y2 = ((rect2.top + rect2.height / 2) - svgRect.top) / currentZoom;
                     let x1, x2;
 
                     const matchData = appState.matches[`r${r}_m${m}`];
-                    // Если у матча есть победитель, добавляем класс к линии для ее подсветки
                     const lineClass = (matchData && matchData.winner) ? `path-node-${matchData.winner}` : '';
 
                     if (currentViewMode === 'linear') {
-                        x1 = rect1.right - svgRect.left;
-                        x2 = rect2.left - svgRect.left;
+                        x1 = (rect1.right - svgRect.left) / currentZoom;
+                        x2 = (rect2.left - svgRect.left) / currentZoom;
                         const midX = x1 + (x2 - x1) / 2;
                         paths += `<path d="M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}" class="bracket-line ${lineClass}" />`;
                     } else if (currentViewMode === 'split') {
                         const isRightSide = m > totalM / 2;
                         if (isRightSide) {
-                            x1 = rect1.left - svgRect.left;
-                            x2 = rect2.right - svgRect.left;
+                            x1 = (rect1.left - svgRect.left) / currentZoom;
+                            x2 = (rect2.right - svgRect.left) / currentZoom;
                             const midX = x1 - (x1 - x2) / 2;
                             paths += `<path d="M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}" class="bracket-line ${lineClass}" />`;
                         } else {
-                            x1 = rect1.right - svgRect.left;
-                            x2 = rect2.left - svgRect.left;
+                            x1 = (rect1.right - svgRect.left) / currentZoom;
+                            x2 = (rect2.left - svgRect.left) / currentZoom;
                             const midX = x1 + (x2 - x1) / 2;
                             paths += `<path d="M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}" class="bracket-line ${lineClass}" />`;
                         }
@@ -380,6 +469,14 @@
             const walk = (x - startX) * 2; // Множитель скорости скролла
             slider.scrollLeft = scrollLeft - walk;
         });
+
+        // Поддержка зума колесиком мыши (при зажатом Ctrl)
+        slider.addEventListener('wheel', (e) => {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                changeZoom(e.deltaY > 0 ? -0.1 : 0.1);
+            }
+        }, { passive: false });
     }
 
     loadData();
