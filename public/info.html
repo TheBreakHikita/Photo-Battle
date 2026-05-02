@@ -18,7 +18,18 @@
         .back-btn:hover { background: #475569; }
 
         h1 { text-align: center; margin-bottom: 30px; font-size: 2.2em; color: var(--accent); }
-        .description { font-size: 1.1em; margin-bottom: 40px; color: var(--text); white-space: pre-wrap; } /* white-space: pre-wrap сохраняет переносы строк */
+        
+        /* Стили для сворачивающихся блоков */
+        .info-block { background: #0f172a; border: 1px solid #334155; border-radius: 12px; margin-bottom: 15px; overflow: hidden; }
+        .info-header { padding: 18px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; font-weight: bold; font-size: 1.2em; color: var(--text); transition: background 0.2s; user-select: none; }
+        .info-header:hover { background: #1e293b; }
+        .info-header .arrow { transition: transform 0.3s ease; font-size: 0.9em; color: var(--accent); }
+        .info-block.expanded .info-header .arrow { transform: rotate(180deg); }
+        
+        .info-content { max-height: 0; overflow: hidden; transition: max-height 0.4s ease, padding 0.4s ease; background: var(--surface); }
+        .info-block.expanded .info-content { max-height: 2000px; padding: 20px; }
+        
+        .description-text { font-size: 1.1em; color: var(--text); white-space: pre-wrap; line-height: 1.6; }
 
         .cta-container { text-align: center; margin-top: 40px; border-top: 1px solid #334155; padding-top: 40px; }
         .btn { display: inline-block; background: var(--winner); color: white; padding: 18px 50px; border-radius: 30px; text-decoration: none; font-weight: bold; font-size: 1.3em; transition: 0.2s; box-shadow: 0 10px 20px rgba(34, 197, 94, 0.3); box-sizing: border-box; text-align: center; }
@@ -45,8 +56,10 @@
     <div id="loading">Загрузка информации...</div>
     
     <div id="content">
-        <h1 id="infoTitle">Заголовок</h1>
-        <div class="description" id="infoDesc">Описание</div>
+        <h1>Информация об ивенте</h1>
+        
+        <!-- Контейнер для блоков -->
+        <div id="blocksContainer"></div>
         
         <div class="cta-container" id="ctaContainer">
             <a href="#" class="btn" id="infoBtn" target="_blank">Участвовать</a>
@@ -66,14 +79,44 @@
         }
     }
 
+    function toggleBlock(element) {
+        const block = element.closest('.info-block');
+        block.classList.toggle('expanded');
+    }
+
     function render(state) {
         document.getElementById('loading').style.display = 'none';
         document.getElementById('content').style.display = 'block';
 
         const info = state.eventInfo || {};
         
-        document.getElementById('infoTitle').innerText = info.title || 'Информация';
-        document.getElementById('infoDesc').innerText = info.description || 'Тут пока ничего нет.'; // innerText + CSS white-space сохраняет абзацы
+        // Миграция старых данных или использование новых блоков
+        let blocks = info.blocks;
+        if (!blocks || blocks.length === 0) {
+            blocks = [{
+                title: info.title || 'Главная информация',
+                description: info.description || 'Тут пока ничего нет.',
+                expanded: true
+            }];
+        }
+
+        const container = document.getElementById('blocksContainer');
+        container.innerHTML = '';
+
+        blocks.forEach((block, index) => {
+            const isExpanded = block.expanded ? 'expanded' : '';
+            container.innerHTML += `
+                <div class="info-block ${isExpanded}">
+                    <div class="info-header" onclick="toggleBlock(this)">
+                        <span>${block.title}</span>
+                        <span class="arrow">▼</span>
+                    </div>
+                    <div class="info-content">
+                        <div class="description-text">${block.description}</div>
+                    </div>
+                </div>
+            `;
+        });
         
         const btn = document.getElementById('infoBtn');
         const ctaContainer = document.getElementById('ctaContainer');

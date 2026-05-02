@@ -102,17 +102,14 @@
 
     <h2>6. Страница "Инфо / Как участвовать"</h2>
     <a href="/info.html" target="_blank" class="btn" style="background: #334155; display: inline-block; text-align: center; margin-bottom: 15px; text-decoration: none;">👀 Посмотреть страницу Инфо</a>
-    <div class="admin-match">
+    
+    <div id="infoBlocksAdminContainer"></div>
+    <button class="btn" onclick="addInfoBlock()" style="background: #10b981; margin-bottom: 20px;">➕ Добавить инфо-блок</button>
+
+    <div class="admin-match" style="margin-top: 20px;">
+        <h3 style="margin-top: 0;">Настройка главной кнопки</h3>
         <div class="form-group">
-            <label>Заголовок страницы:</label>
-            <input type="text" id="infoTitle" placeholder="Как участвовать в турнире?">
-        </div>
-        <div class="form-group">
-            <label>Описание и правила (можно с переносом строк):</label>
-            <textarea id="infoDesc" rows="6" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-family: sans-serif; box-sizing: border-box;"></textarea>
-        </div>
-        <div class="form-group">
-            <label>Текст на кнопке:</label>
+            <label>Текст на кнопке (оставьте пустым, чтобы скрыть):</label>
             <input type="text" id="infoBtnText" placeholder="Участвовать">
         </div>
         <div class="form-group">
@@ -187,15 +184,27 @@
         if(!appState.battles) appState.battles = []; 
         if(!appState.organizers) appState.organizers = [];
         if(!appState.matches) appState.matches = {};
-        if(!appState.eventInfo) appState.eventInfo = { title: "Как участвовать?", description: "Правила...", buttonText: "Участвовать", buttonLink: "" };
+        if(!appState.eventInfo) {
+            appState.eventInfo = { blocks: [], buttonText: "Участвовать", buttonLink: "" };
+        }
+        // Миграция старого формата данных в новый
+        if (!appState.eventInfo.blocks) {
+            appState.eventInfo.blocks = [];
+            if (appState.eventInfo.title || appState.eventInfo.description) {
+                appState.eventInfo.blocks.push({
+                    id: 'ib' + Date.now(),
+                    title: appState.eventInfo.title || 'Главная информация',
+                    description: appState.eventInfo.description || '',
+                    expanded: true
+                });
+            }
+        }
         renderAdmin();
     }
 
     function renderAdmin() {
         document.getElementById('modeSelect').value = appState.mode;
         document.getElementById('heroStatus').value = appState.heroStatus;
-        document.getElementById('infoTitle').value = appState.eventInfo.title || '';
-        document.getElementById('infoDesc').value = appState.eventInfo.description || '';
         document.getElementById('infoBtnText').value = appState.eventInfo.buttonText || '';
         document.getElementById('infoBtnLink').value = appState.eventInfo.buttonLink || '';
         
@@ -203,6 +212,7 @@
         renderBracketControls();
         renderBattles();
         renderOrganizers();
+        renderInfoBlocks(); // Отрисовка новых инфо-блоков
     }
 
     // --- УЧАСТНИКИ ---
@@ -416,6 +426,55 @@
         }));
     }
 
+    // --- ИНФО-БЛОКИ ---
+    function renderInfoBlocks() {
+        const container = document.getElementById('infoBlocksAdminContainer');
+        container.innerHTML = '';
+        appState.eventInfo.blocks.forEach((block, index) => {
+            const isChecked = block.expanded ? 'checked' : '';
+            container.innerHTML += `
+            <div class="admin-match" style="border-left: 4px solid #8b5cf6;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <strong style="font-size: 1.1em;">Инфо-блок #${index + 1}</strong>
+                    <button onclick="removeInfoBlock('${block.id}')" style="background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor:pointer;">Удалить блок</button>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; gap: 10px; background: #fff; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
+                    <input type="checkbox" class="ib-expanded" style="width: 20px; height: 20px;" ${isChecked}>
+                    <label style="margin: 0; cursor: pointer;">Показывать блок развернутым по умолчанию</label>
+                </div>
+                <div class="form-group">
+                    <label>Заголовок (виден всегда):</label>
+                    <input type="text" class="ib-title" value="${block.title}">
+                </div>
+                <div class="form-group">
+                    <label>Текст/Описание (сворачивается):</label>
+                    <textarea class="ib-desc" rows="4" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;">${block.description}</textarea>
+                </div>
+            </div>`;
+        });
+    }
+
+    function addInfoBlock() { 
+        appState.eventInfo.blocks.push({ id: 'ib' + Date.now(), title: "Новый раздел", description: "", expanded: false }); 
+        renderInfoBlocks(); 
+    }
+    
+    function removeInfoBlock(id) { 
+        if(!confirm('Удалить этот инфо-блок?')) return;
+        appState.eventInfo.blocks = appState.eventInfo.blocks.filter(b => b.id !== id); 
+        renderInfoBlocks(); 
+    }
+    
+    function saveInfoBlocksToState() {
+        const blocks = document.querySelectorAll('#infoBlocksAdminContainer .admin-match');
+        appState.eventInfo.blocks = Array.from(blocks).map((block, i) => ({
+            id: appState.eventInfo.blocks[i].id,
+            expanded: block.querySelector('.ib-expanded').checked,
+            title: block.querySelector('.ib-title').value,
+            description: block.querySelector('.ib-desc').value
+        }));
+    }
+
     function resetTournament() {
         if(!confirm("Удалить ВСЕХ участников и сетку?")) return;
         appState.participants = [];
@@ -428,11 +487,11 @@
         updateParticipantsArray(); 
         saveBattlesToState();
         saveOrganizersToState();
+        saveInfoBlocksToState(); // Сохраняем новые блоки
 
         appState.mode = document.getElementById('modeSelect').value;
         appState.eventInfo = {
-            title: document.getElementById('infoTitle').value,
-            description: document.getElementById('infoDesc').value,
+            blocks: appState.eventInfo.blocks,
             buttonText: document.getElementById('infoBtnText').value,
             buttonLink: document.getElementById('infoBtnLink').value
         };
