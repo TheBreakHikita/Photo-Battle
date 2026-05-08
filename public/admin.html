@@ -112,6 +112,7 @@
     <h2>2. Участники (Списком)</h2>
     <p style="font-size: 0.8em; color: #666;">Добавьте сколько угодно участников. После завершения списка нажмите "Сгенерировать сетку".</p>
     <button class="btn" onclick="addParticipant()" style="background: #10b981; width: auto; margin-bottom: 10px;">➕ Добавить участника</button>
+    <button class="btn" onclick="shuffleParticipants()" style="background: #f59e0b; color: white; width: auto; margin-bottom: 10px; margin-left: 5px;">🔀 Перемешать случайно</button>
     <ul id="participantsList"></ul>
     <button class="btn" onclick="generateBracket()" style="background: #8b5cf6; margin-top: 15px;">⚡ Сгенерировать турнирную сетку</button>
 
@@ -294,6 +295,22 @@
         }));
     }
 
+    function shuffleParticipants() {
+        if (!confirm('Вы уверены, что хотите случайно перемешать всех участников? Текущий порядок изменится.')) return;
+        
+        // Сначала сохраняем то, что админ уже ввел в текстовые поля, чтобы ничего не потерялось
+        updateParticipantsArray();
+        
+        // Алгоритм Фишера-Йейтса для случайного перемешивания массива
+        for (let i = appState.participants.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [appState.participants[i], appState.participants[j]] = [appState.participants[j], appState.participants[i]];
+        }
+        
+        // Перерисовываем список на экране с новым порядком
+        renderParticipants();
+    }
+
     // --- АЛГОРИТМ ГЕНЕРАЦИИ СЕТКИ (НА ЛЮБОЕ КОЛ-ВО УЧАСТНИКОВ) ---
     function generateBracket() {
         updateParticipantsArray();
@@ -396,6 +413,16 @@
     }
 
     // --- ОСТАЛЬНЫЕ ФУНКЦИИ (Бои, Организаторы, Сохранение) ---
+    // Функция для создания выпадающего списка участников
+    function getParticipantOptions(selectedId) {
+        let html = '<option value="">-- Без привязки (пусто) --</option>';
+        appState.participants.forEach(p => {
+            const sel = (p.id === selectedId) ? 'selected' : '';
+            html += `<option value="${p.id}" ${sel}>${p.emoji} ${p.name}</option>`;
+        });
+        return html;
+    }
+
     function renderBattles() {
         const container = document.getElementById('battlesAdminContainer');
         container.innerHTML = '';
@@ -416,14 +443,40 @@
                     </select>
                 </div>
                 <div class="form-group"><label>Заголовок:</label><input type="text" class="b-title" value="${b.title}"></div>
-                <div class="form-group"><label>Фото 1:</label><input type="text" class="b-p1" value="${b.photo1}"></div>
-                <div class="form-group"><label>Фото 2:</label><input type="text" class="b-p2" value="${b.photo2}"></div>
+                <div class="form-group"><label>Таймер (до какого времени):</label><input type="datetime-local" class="b-endtime" value="${b.endTime || ''}" style="cursor: pointer;"></div>
+                
+                <div style="display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 250px; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #ccc;">
+                        <label>Участник 1 (под левым фото):</label>
+                        <select class="b-p1-id" style="margin-bottom: 10px;">
+                            ${getParticipantOptions(b.participant1)}
+                        </select>
+                        <label>Фото 1 (ссылка):</label><input type="text" class="b-p1" value="${b.photo1}">
+                    </div>
+                    <div style="flex: 1; min-width: 250px; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #ccc;">
+                        <label>Участник 2 (под правым фото):</label>
+                        <select class="b-p2-id" style="margin-bottom: 10px;">
+                            ${getParticipantOptions(b.participant2)}
+                        </select>
+                        <label>Фото 2 (ссылка):</label><input type="text" class="b-p2" value="${b.photo2}">
+                    </div>
+                </div>
+
+                <div class="form-group" style="background: rgba(34, 197, 94, 0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3);">
+                    <label>👑 Кто победил? (Применяется только при статусе "Победитель выбран"):</label>
+                    <select class="b-winner">
+                        <option value="" ${!b.winner ? 'selected' : ''}>Ожидание результатов...</option>
+                        <option value="1" ${b.winner === '1' ? 'selected' : ''}>Победило Фото 1 (Левое)</option>
+                        <option value="2" ${b.winner === '2' ? 'selected' : ''}>Победило Фото 2 (Правое)</option>
+                    </select>
+                </div>
+
                 <div class="form-group"><label>Ссылка на пост:</label><input type="text" class="b-link" value="${b.link}"></div>
             </div>`;
         });
     }
 
-    function addBattle() { appState.battles.push({ id: 'b' + Date.now(), title: "Новый бой", photo1: "", photo2: "", link: "", status: "active" }); renderBattles(); }
+    function addBattle() { appState.battles.push({ id: 'b' + Date.now(), title: "Новый бой", photo1: "", photo2: "", link: "", status: "active", endTime: "", participant1: "", participant2: "", winner: "" }); renderBattles(); }
     function removeBattle(id) { appState.battles = appState.battles.filter(b => b.id !== id); renderBattles(); }
     function saveBattlesToState() {
         const blocks = document.querySelectorAll('#battlesAdminContainer .admin-match');
@@ -431,6 +484,10 @@
             id: appState.battles[i].id, 
             status: block.querySelector('.b-status').value,
             title: block.querySelector('.b-title').value,
+            endTime: block.querySelector('.b-endtime').value,
+            participant1: block.querySelector('.b-p1-id').value,
+            participant2: block.querySelector('.b-p2-id').value,
+            winner: block.querySelector('.b-winner').value,
             photo1: block.querySelector('.b-p1').value, 
             photo2: block.querySelector('.b-p2').value, 
             link: block.querySelector('.b-link').value

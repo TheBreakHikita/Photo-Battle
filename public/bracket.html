@@ -106,6 +106,8 @@
     </style>
     <!-- Заглушка для favicon, чтобы не было ошибки 404 -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23fbbf24'/></svg>">
+    <!-- Скрипт для эффекта конфетти -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 </head>
 <body>
 
@@ -142,6 +144,41 @@
     let appState = null;
     let lastStateHash = "";
     // Загружаем сохраненный режим отображения. Для мобилок по умолчанию ставим "list"
+    let confettiInterval = null;
+
+    function startConfetti() {
+        // Если салют уже идет или библиотека не загрузилась - ничего не делаем
+        if (confettiInterval || typeof confetti === 'undefined') return;
+        
+        // Запускаем залпы каждые 300мс
+        confettiInterval = setInterval(() => {
+            // Залп слева
+            confetti({
+                particleCount: 5,
+                angle: 60,
+                spread: 55,
+                origin: { x: 0, y: 0.8 },
+                colors: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'],
+                zIndex: 9999
+            });
+            // Залп справа
+            confetti({
+                particleCount: 5,
+                angle: 120,
+                spread: 55,
+                origin: { x: 1, y: 0.8 },
+                colors: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'],
+                zIndex: 9999
+            });
+        }, 300);
+    }
+
+    function stopConfetti() {
+        if (confettiInterval) {
+            clearInterval(confettiInterval);
+            confettiInterval = null;
+        }
+    }
     let currentViewMode = localStorage.getItem('bracketViewMode') || (window.innerWidth < 768 ? 'list' : 'split');
 
     let currentContentMode = localStorage.getItem('bracketContentMode') || 'full';
@@ -253,6 +290,7 @@
         if (!appState.bracketMeta || !appState.bracketMeta.rounds) {
             container.innerHTML = "Сетка еще не сформирована администратором.";
             switcher.style.display = 'none';
+            stopConfetti(); // Выключаем конфетти, если сетку сбросили
             return;
         }
 
@@ -294,6 +332,14 @@
         
         const R = appState.bracketMeta.rounds;
         let html = '';
+
+        // Проверяем, есть ли победитель в самом последнем матче (финале)
+        const finalMatch = appState.matches[`r${R}_m1`];
+        if (finalMatch && finalMatch.winner) {
+            startConfetti();
+        } else {
+            stopConfetti();
+        }
 
         if (currentViewMode === 'list') {
             html += '<div class="list-bracket">';
