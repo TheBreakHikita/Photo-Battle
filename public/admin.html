@@ -25,13 +25,13 @@
         .menu-item.active { background: #0f172a; color: white; border-left-color: var(--primary); font-weight: bold; }
         
         /* Main Content */
-        .main-content { flex-grow: 1; display: flex; flex-direction: column; position: relative; background: var(--bg); overflow: hidden; }
-        .content-area { padding: 30px 40px 100px 40px; overflow-y: auto; flex-grow: 1; } /* 100px padding for footer */
+        .main-content { flex: 1; display: flex; flex-direction: column; background: var(--bg); min-height: 0; min-width: 0; }
+        .content-area { padding: 30px 40px; overflow-y: auto; flex: 1; }
         .tab-section { display: none; max-width: 900px; margin: 0 auto; animation: fadeIn 0.3s ease; }
         .tab-section.active { display: block; }
         
         /* Fixed Footer */
-        .bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 15px 40px; display: flex; justify-content: flex-end; gap: 15px; box-shadow: 0 -4px 10px rgba(0,0,0,0.02); z-index: 100; }
+        .bottom-bar { flex-shrink: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 15px 40px; display: flex; justify-content: flex-end; gap: 15px; box-shadow: 0 -4px 10px rgba(0,0,0,0.02); z-index: 100; }
         
         /* Typography & Elements */
         h2 { border-bottom: 2px solid var(--border); padding-bottom: 10px; margin: 0 0 20px 0; color: #0f172a; }
@@ -83,11 +83,12 @@
         /* Mobile */
         @media (max-width: 768px) {
             #adminContainer { flex-direction: column; }
-            .sidebar { width: 100%; height: auto; flex-direction: row; flex-wrap: wrap; }
+            .sidebar { flex-shrink: 0; width: 100%; height: auto; flex-direction: row; flex-wrap: wrap; }
             .sidebar-header { width: 100%; }
             .sidebar-menu { display: flex; overflow-x: auto; padding: 0; white-space: nowrap; }
             .menu-item { border-left: none; border-bottom: 4px solid transparent; }
             .menu-item.active { border-bottom-color: var(--primary); }
+            .content-area { padding: 20px 15px; } /* Делаем отступы на телефоне поменьше */
             .bottom-bar { padding: 15px; flex-direction: column; }
             .bottom-bar .btn { width: 100%; }
             .participant-item { flex-wrap: wrap; }
