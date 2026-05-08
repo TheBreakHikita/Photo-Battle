@@ -7,49 +7,91 @@
     <!-- Подключаем библиотеку для Drag-and-Drop -->
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #f4f4f9; padding: 20px; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 30px; }
+        :root { --primary: #3b82f6; --danger: #ef4444; --success: #10b981; --warning: #f59e0b; --bg: #f8fafc; --surface: #ffffff; --text: #334155; --border: #e2e8f0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; }
         
+        /* Layout */
+        #loginScreen { position: fixed; inset: 0; background: var(--bg); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .login-box { background: var(--surface); padding: 40px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); width: 320px; text-align: center; }
+        
+        #adminContainer { display: flex; width: 100%; height: 100vh; }
+        
+        /* Sidebar */
+        .sidebar { width: 260px; background: #1e293b; color: white; display: flex; flex-direction: column; flex-shrink: 0; }
+        .sidebar-header { padding: 20px; font-size: 1.2em; font-weight: bold; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; }
+        .sidebar-menu { padding: 15px 0; flex-grow: 1; overflow-y: auto; }
+        .menu-item { padding: 15px 20px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: 0.2s; color: #cbd5e1; border-left: 4px solid transparent; }
+        .menu-item:hover { background: #334155; color: white; }
+        .menu-item.active { background: #0f172a; color: white; border-left-color: var(--primary); font-weight: bold; }
+        
+        /* Main Content */
+        .main-content { flex-grow: 1; display: flex; flex-direction: column; position: relative; background: var(--bg); overflow: hidden; }
+        .content-area { padding: 30px 40px 100px 40px; overflow-y: auto; flex-grow: 1; } /* 100px padding for footer */
+        .tab-section { display: none; max-width: 900px; margin: 0 auto; animation: fadeIn 0.3s ease; }
+        .tab-section.active { display: block; }
+        
+        /* Fixed Footer */
+        .bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; background: var(--surface); border-top: 1px solid var(--border); padding: 15px 40px; display: flex; justify-content: flex-end; gap: 15px; box-shadow: 0 -4px 10px rgba(0,0,0,0.02); z-index: 100; }
+        
+        /* Typography & Elements */
+        h2 { border-bottom: 2px solid var(--border); padding-bottom: 10px; margin: 0 0 20px 0; color: #0f172a; }
+        h3 { margin-top: 0; color: #1e293b; }
         .form-group { margin-bottom: 15px; }
-        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
-        input, select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; color: #475569; }
+        input, select, textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; font-size: 0.95em; transition: 0.2s; }
+        input:focus, select:focus, textarea:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
         
-        .btn { background: #3b82f6; color: white; border: none; padding: 12px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
-        .btn-danger { background: #ef4444; }
-        
-        /* Участники D&D */
-        #participantsList { list-style: none; padding: 0; }
-        .participant-item { display: flex; align-items: center; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; margin-bottom: 5px; border-radius: 5px; cursor: grab; }
-        .participant-item input { margin-left: 10px; width: auto; flex-grow: 1; }
-        
-        /* Сетка в админке */
-        .admin-match { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px; background: #fafafa; }
-        .admin-match button { margin: 5px; padding: 5px 10px; cursor: pointer; }
-        .winner-btn.active { background: #22c55e; color: white; border-color: #22c55e; }
-        
-        /* Экран логина */
-        #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f4f4f9; display: flex; justify-content: center; align-items: center; z-index: 1000; }
-        .login-box { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 300px; text-align: center; }
-        
-        /* Кнопки импорта/экспорта */
-        .flex-buttons { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-        .flex-buttons .btn { margin-top: 0; flex: 1; min-width: 200px; }
-        .btn-outline { background: transparent; border: 2px solid #3b82f6; color: #3b82f6; }
+        /* Buttons */
+        .btn { border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.95em; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-success:hover { background: #059669; }
+        .btn-warning { background: var(--warning); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); }
         .btn-outline:hover { background: #eff6ff; }
-        /* Стили для аналитики */
-        .analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px; margin-bottom: 20px; }
-        .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .btn-logout { background: transparent; color: #ef4444; border: 1px solid #ef4444; padding: 5px 10px; font-size: 0.8em; }
+        .btn-logout:hover { background: #ef4444; color: white; }
+        
+        /* Cards & Blocks */
+        .admin-block { background: var(--surface); border: 1px solid var(--border); padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .admin-match { background: #fafafa; border: 1px solid var(--border); padding: 15px; margin-bottom: 15px; border-radius: 8px; }
+        .border-left-blue { border-left: 4px solid var(--primary); }
+        .border-left-purple { border-left: 4px solid #8b5cf6; }
+        .border-left-orange { border-left: 4px solid var(--warning); }
+        
+        /* Participants D&D */
+        #participantsList { list-style: none; padding: 0; margin: 0 0 20px 0; }
+        .participant-item { display: flex; align-items: center; padding: 10px 15px; background: var(--surface); border: 1px solid var(--border); margin-bottom: 8px; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+        .participant-item input { margin-left: 10px; }
+        .drag-handle { cursor: grab; font-size: 1.2em; padding: 0 10px 0 0; color: #94a3b8; }
+        .drag-handle:active { cursor: grabbing; }
+        
+        /* Analytics */
+        .analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; text-align: center; }
         .stat-card h4 { margin: 0 0 5px 0; color: #64748b; font-size: 0.9em; }
-        .stat-card .value { font-size: 1.8em; font-weight: bold; color: #3b82f6; margin: 0; }
-        .stat-card.total .value { color: #10b981; }
+        .stat-card .value { font-size: 2em; font-weight: bold; color: var(--primary); margin: 0; }
+        .stat-card.total .value { color: var(--success); }
 
-        /* Mobile Adaptation */
-        @media (max-width: 600px) {
-            .participant-item { flex-direction: column; align-items: stretch; text-align: center; padding: 15px; }
-            .participant-item input { margin: 5px 0; width: 100% !important; }
-            .participant-item button { margin: 5px 0 0 0; }
-            .container { padding: 15px; }
+        .winner-btn { margin: 5px; padding: 8px 12px; border: 1px solid #ccc; background: white; border-radius: 4px; cursor: pointer; }
+        .winner-btn.active { background: var(--success); color: white; border-color: var(--success); }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Mobile */
+        @media (max-width: 768px) {
+            #adminContainer { flex-direction: column; }
+            .sidebar { width: 100%; height: auto; flex-direction: row; flex-wrap: wrap; }
+            .sidebar-header { width: 100%; }
+            .sidebar-menu { display: flex; overflow-x: auto; padding: 0; white-space: nowrap; }
+            .menu-item { border-left: none; border-bottom: 4px solid transparent; }
+            .menu-item.active { border-bottom-color: var(--primary); }
+            .bottom-bar { padding: 15px; flex-direction: column; }
+            .bottom-bar .btn { width: 100%; }
+            .participant-item { flex-wrap: wrap; }
+            .participant-item input { margin: 5px 0; width: 100%; }
         }
     </style>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='50' fill='%23fbbf24'/></svg>">
@@ -64,90 +106,142 @@
     </div>
 </div>
 
-<div class="container" id="adminContainer" style="display: none;">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h1>⚙️ Управление Турниром</h1>
-        <button class="btn btn-danger" style="width: auto; padding: 8px 15px;" onclick="logout()">Выйти</button>
-    </div>
-
-    <!-- Блок Аналитики -->
-    <div class="analytics-grid">
-        <div class="stat-card total">
-            <h4>Всего просмотров</h4>
-            <p class="value" id="statTotal">0</p>
+<div id="adminContainer" style="display: none;">
+    <!-- Боковое меню -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <span>⚙️ Админ Панель</span>
+            <button class="btn btn-logout" onclick="logout()">Выйти</button>
         </div>
-        <div class="stat-card">
-            <h4>Главная (Батлы)</h4>
-            <p class="value" id="statIndex">0</p>
+        <div class="sidebar-menu">
+            <div class="menu-item active" onclick="switchTab('tab-dash')">📊 Дашборд</div>
+            <div class="menu-item" onclick="switchTab('tab-main')">🏠 Главная страница</div>
+            <div class="menu-item" onclick="switchTab('tab-tournament')">🏆 Турнирная сетка</div>
+            <div class="menu-item" onclick="switchTab('tab-info')">ℹ️ Страница Инфо</div>
         </div>
-        <div class="stat-card">
-            <h4>Сетка (Турнир)</h4>
-            <p class="value" id="statBracket">0</p>
+    </aside>
+
+    <!-- Основной контент -->
+    <main class="main-content">
+        <div class="content-area">
+            
+            <!-- Вкладка 1: ДАШБОРД -->
+            <section id="tab-dash" class="tab-section active">
+                <h2>Аналитика просмотров</h2>
+                <div class="analytics-grid">
+                    <div class="stat-card total"><h4>Всего просмотров</h4><p class="value" id="statTotal">0</p></div>
+                    <div class="stat-card"><h4>Главная (Батлы)</h4><p class="value" id="statIndex">0</p></div>
+                    <div class="stat-card"><h4>Сетка (Турнир)</h4><p class="value" id="statBracket">0</p></div>
+                    <div class="stat-card"><h4>Информация</h4><p class="value" id="statInfo">0</p></div>
+                </div>
+
+                <h2>Резервное копирование</h2>
+                <div class="admin-block" style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <button class="btn btn-outline" onclick="exportState()">⬇️ Экспорт бэкапа (JSON)</button>
+                    <label class="btn btn-outline" style="cursor: pointer; margin: 0;">
+                        ⬆️ Импорт из бэкапа
+                        <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importState(event)">
+                    </label>
+                </div>
+            </section>
+
+            <!-- Вкладка 2: ГЛАВНАЯ СТРАНИЦА -->
+            <section id="tab-main" class="tab-section">
+                <h2>Настройки главной страницы</h2>
+                <div class="admin-block border-left-blue">
+                    <div class="form-group">
+                        <label>Режим сайта:</label>
+                        <select id="modeSelect">
+                            <option value="presentation">Режим Презентации (Ожидание турнира)</option>
+                            <option value="active">Активный Режим (Идет турнир)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Статус (бэйдж под главным заголовком):</label>
+                        <input type="text" id="heroStatus" placeholder="Например: Идет регистрация!">
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="margin: 0; border: none;">Активные бои (Батлы)</h2>
+                    <button class="btn btn-success" onclick="addBattle()">➕ Добавить бой</button>
+                </div>
+                <div id="battlesAdminContainer"></div>
+
+                <h2>Заглушка (когда нет боев)</h2>
+                <div class="admin-block border-left-orange">
+                    <p style="font-size: 0.85em; color: #666; margin-top:0;">Будет показан текст "Подождите... Бой скоро появится!". Здесь вы можете настроить кнопку под ним.</p>
+                    <div class="form-group">
+                        <label>Текст кнопки (оставьте пустым, чтобы скрыть):</label>
+                        <input type="text" id="fallbackBtnText" placeholder="Следите за новостями тут">
+                    </div>
+                    <div class="form-group">
+                        <label>Ссылка для перехода:</label>
+                        <input type="text" id="fallbackBtnLink" placeholder="https://t.me/твоя_группа">
+                    </div>
+                </div>
+            </section>
+
+            <!-- Вкладка 3: ТУРНИРНАЯ СЕТКА -->
+            <section id="tab-tournament" class="tab-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0; border: none;">Участники турнира</h2>
+                    <a href="/bracket.html" target="_blank" class="btn btn-outline" style="padding: 5px 15px;">👀 Посмотреть сетку</a>
+                </div>
+                
+                <div class="admin-block">
+                    <div style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button class="btn btn-success" onclick="addParticipant()">➕ Добавить участника</button>
+                        <button class="btn btn-warning" onclick="shuffleParticipants()">🔀 Перемешать случайно</button>
+                        <button class="btn btn-primary" onclick="generateBracket()" style="background: #8b5cf6;">⚡ Сгенерировать турнирную сетку</button>
+                    </div>
+                    <p style="font-size: 0.85em; color: #666; margin-top:0;">Добавьте участников. Можно менять их порядок перетаскиванием (drag-and-drop). Затем нажмите "Сгенерировать сетку".</p>
+                    <ul id="participantsList"></ul>
+                </div>
+
+                <h2>Управление боями (Победители сетки)</h2>
+                <div class="admin-block">
+                    <div id="bracketControls"></div>
+                </div>
+            </section>
+
+            <!-- Вкладка 4: ИНФО СТРАНИЦА -->
+            <section id="tab-info" class="tab-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0; border: none;">Страница "Как участвовать"</h2>
+                    <a href="/info.html" target="_blank" class="btn btn-outline" style="padding: 5px 15px;">👀 Посмотреть страницу</a>
+                </div>
+
+                <div class="admin-block">
+                    <h3>Настройка главной кнопки "Участвовать"</h3>
+                    <div class="form-group">
+                        <label>Текст на кнопке (оставьте пустым, чтобы скрыть):</label>
+                        <input type="text" id="infoBtnText" placeholder="Участвовать">
+                    </div>
+                    <div class="form-group">
+                        <label>Ссылка (например на форму или Telegram):</label>
+                        <input type="text" id="infoBtnLink" placeholder="https://t.me/твоя_группа">
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h2 style="margin: 0; border: none;">Инфо-блоки</h2>
+                    <button class="btn btn-success" onclick="addInfoBlock()">➕ Добавить блок</button>
+                </div>
+                <div id="infoBlocksAdminContainer"></div>
+
+                <h2 style="margin-top: 30px;">Организаторы</h2>
+                <div id="organizersAdminContainer"></div>
+            </section>
+
         </div>
-        <div class="stat-card">
-            <h4>Информация</h4>
-            <p class="value" id="statInfo">0</p>
-        </div>
-    </div>
 
-    <!-- Блок бэкапов -->
-    <div class="flex-buttons" style="background: #f8fafc; padding: 15px; border-radius: 8px; margin-top: 20px;">
-        <button class="btn btn-outline" onclick="exportState()">⬇️ Экспорт бэкапа (JSON)</button>
-        <label class="btn btn-outline" style="cursor: pointer; text-align: center;">
-            ⬆️ Импорт из бэкапа
-            <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importState(event)">
-        </label>
-    </div>
-
-    <h2>1. Режим сайта</h2>
-    <select id="modeSelect">
-        <option value="presentation">Режим Презентации (Ожидание турнира)</option>
-        <option value="active">Активный Режим (Идет турнир)</option>
-    </select>
-    <div class="form-group" style="margin-top: 10px;">
-        <label>Статус (под главным заголовком):</label>
-        <input type="text" id="heroStatus">
-    </div>
-
-    <h2>2. Участники (Списком)</h2>
-    <p style="font-size: 0.8em; color: #666;">Добавьте сколько угодно участников. После завершения списка нажмите "Сгенерировать сетку".</p>
-    <button class="btn" onclick="addParticipant()" style="background: #10b981; width: auto; margin-bottom: 10px;">➕ Добавить участника</button>
-    <button class="btn" onclick="shuffleParticipants()" style="background: #f59e0b; color: white; width: auto; margin-bottom: 10px; margin-left: 5px;">🔀 Перемешать случайно</button>
-    <ul id="participantsList"></ul>
-    <button class="btn" onclick="generateBracket()" style="background: #8b5cf6; margin-top: 15px;">⚡ Сгенерировать турнирную сетку</button>
-
-    <h2>3. Управление боями (Выбор победителей)</h2>
-    <a href="/bracket.html" target="_blank" class="btn" style="background: #334155; display: inline-block; text-align: center; margin-bottom: 15px; text-decoration: none;">👀 Посмотреть готовую сетку</a>
-    <div id="bracketControls"></div>
-
-    <h2>4. Активные бои</h2>
-    <div id="battlesAdminContainer"></div>
-    <button class="btn" onclick="addBattle()" style="background: #10b981; margin-bottom: 20px;">➕ Добавить еще один бой</button>
-
-    <h2>5. Организаторы</h2>
-    <div id="organizersAdminContainer"></div>
-
-    <h2>6. Страница "Инфо / Как участвовать"</h2>
-    <a href="/info.html" target="_blank" class="btn" style="background: #334155; display: inline-block; text-align: center; margin-bottom: 15px; text-decoration: none;">👀 Посмотреть страницу Инфо</a>
-    
-    <div id="infoBlocksAdminContainer"></div>
-    <button class="btn" onclick="addInfoBlock()" style="background: #10b981; margin-bottom: 20px;">➕ Добавить инфо-блок</button>
-
-    <div class="admin-match" style="margin-top: 20px;">
-        <h3 style="margin-top: 0;">Настройка главной кнопки</h3>
-        <div class="form-group">
-            <label>Текст на кнопке (оставьте пустым, чтобы скрыть):</label>
-            <input type="text" id="infoBtnText" placeholder="Участвовать">
-        </div>
-        <div class="form-group">
-            <label>Ссылка для кнопки (переход по клику):</label>
-            <input type="text" id="infoBtnLink" placeholder="https://t.me/твоя_группа">
-        </div>
-    </div>
-
-    <hr style="margin: 30px 0;">
-    <button class="btn" onclick="saveState()" style="font-size: 1.1em; padding: 15px;">💾 Сохранить и применить на сайте</button>
-    <button class="btn btn-danger" onclick="resetTournament()" style="margin-top: 20px;">⚠️ Сбросить сетку (Начать заново)</button>
+        <!-- Закрепленная панель кнопок внизу -->
+        <footer class="bottom-bar">
+            <button class="btn btn-danger" onclick="resetTournament()">⚠️ Сбросить турнир (Начать заново)</button>
+            <button class="btn btn-primary" onclick="saveState()" style="font-size: 1.1em; padding: 12px 30px;">💾 Сохранить изменения</button>
+        </footer>
+    </main>
 </div>
 
 <script>
@@ -156,6 +250,19 @@
 
     // Логика аутентификации
     if (authToken) { showAdmin(); }
+
+    // Логика переключения вкладок
+    function switchTab(tabId) {
+        // Скрываем все вкладки
+        document.querySelectorAll('.tab-section').forEach(el => el.classList.remove('active'));
+        // Снимаем выделение со всех пунктов меню
+        document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('active'));
+        
+        // Показываем нужную вкладку
+        document.getElementById(tabId).classList.add('active');
+        // Выделяем нажатый пункт меню
+        event.currentTarget.classList.add('active');
+    }
 
     async function login() {
         const pass = document.getElementById('loginPassword').value;
@@ -221,6 +328,9 @@
         if(!appState.analytics) {
             appState.analytics = { index: 0, bracket: 0, info: 0, total: 0 };
         }
+        if(!appState.fallback) {
+            appState.fallback = { btnText: "Следите за новостями тут", btnLink: "" };
+        }
             if (appState.eventInfo.title || appState.eventInfo.description) {
                 appState.eventInfo.blocks.push({
                     id: 'ib' + Date.now(),
@@ -238,6 +348,8 @@
         document.getElementById('heroStatus').value = appState.heroStatus;
         document.getElementById('infoBtnText').value = appState.eventInfo.buttonText || '';
         document.getElementById('infoBtnLink').value = appState.eventInfo.buttonLink || '';
+        document.getElementById('fallbackBtnText').value = appState.fallback?.btnText || '';
+        document.getElementById('fallbackBtnLink').value = appState.fallback?.btnLink || '';
         // Отрисовка статистики
         document.getElementById('statTotal').innerText = appState.analytics.total || 0;
         document.getElementById('statIndex').innerText = appState.analytics.index || 0;
@@ -260,12 +372,12 @@
             li.className = 'participant-item';
             li.dataset.id = p.id;
             li.innerHTML = `
-                <span style="cursor: grab; font-size: 1.2em; padding: 0 10px;">↕️</span>
-                <span style="font-weight:bold; color:#888; width: 30px;">#${index+1}</span>
-               <input type="text" value="${p.emoji}" class="p-emoji" style="width: 50px;" placeholder="Смайл">
-                <input type="text" value="${p.name}" class="p-name" placeholder="Никнейм">
-                <input type="text" value="${p.link || ''}" class="p-link" placeholder="Ссылка на профиль">
-                <button onclick="removeParticipant('${p.id}')" style="background: #ef4444; color: white; border: none; padding: 10px; margin-left: 10px; border-radius: 5px; cursor:pointer;">❌</button>
+                <span class="drag-handle">↕️</span>
+                <span style="font-weight:bold; color:#94a3b8; width: 35px;">#${index+1}</span>
+                <input type="text" value="${p.emoji}" class="p-emoji" style="width: 60px; text-align: center;" placeholder="Смайл">
+                <input type="text" value="${p.name}" class="p-name" placeholder="Никнейм участника" style="flex: 1;">
+                <input type="text" value="${p.link || ''}" class="p-link" placeholder="Ссылка на профиль (опционально)" style="flex: 1;">
+                <button onclick="removeParticipant('${p.id}')" class="btn btn-danger" style="padding: 10px 15px; margin-left: 10px;">❌</button>
             `;
             list.appendChild(li);
         });
@@ -588,6 +700,10 @@
             buttonLink: document.getElementById('infoBtnLink').value
         };
         appState.heroStatus = document.getElementById('heroStatus').value;
+        appState.fallback = {
+            btnText: document.getElementById('fallbackBtnText').value,
+            btnLink: document.getElementById('fallbackBtnLink').value
+        };
 
         const res = await fetch('/api/state', {
             method: 'POST',
