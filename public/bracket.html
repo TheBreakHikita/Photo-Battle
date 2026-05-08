@@ -17,7 +17,7 @@
         .back-btn:hover { background: #475569; }
 
         /* Split Bracket Layout */
-        .split-bracket { display: flex; justify-content: center; gap: 30px; overflow-x: auto; padding-bottom: 40px; min-width: max-content; margin: 0 auto; cursor: grab; scroll-behavior: smooth; }
+        .split-bracket { display: flex; justify-content: center; gap: 30px; overflow: auto; padding: 40px 20px; min-width: max-content; width: 100%; margin: 0 auto; cursor: grab; scroll-behavior: smooth; }   
         .split-bracket:active { cursor: grabbing; }
         /* Прячем скроллбар для эстетики на десктопе/мобилках */
         .split-bracket::-webkit-scrollbar { display: none; }
@@ -391,7 +391,7 @@
 
         } else if (currentViewMode === 'linear') {
             html += '<div class="split-bracket" style="justify-content: flex-start;">';
-            html += `<div id="zoomWrapper" class="zoom-wrapper" style="display: flex; gap: 30px; position: relative; transform: scale(${currentZoom}); transform-origin: top left; transition: transform 0.2s ease; width: max-content; padding-right: 50px;">`;
+            html += `<div id="zoomWrapper" class="zoom-wrapper" style="display: flex; gap: 30px; position: relative; transform: scale(${currentZoom}); transform-origin: top left; transition: transform 0.2s ease; width: max-content; padding: 40px 50px;">`;
             html += '<svg id="bracketLines" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;"></svg>';
             for(let r = 1; r <= R; r++) {
                 html += '<div class="bracket-col">';
@@ -408,7 +408,7 @@
                 html += `<div class="split-bracket"><div id="zoomWrapper" class="zoom-wrapper" style="transform: scale(${currentZoom}); transform-origin: top center; transition: transform 0.2s ease;"><div class="bracket-center">${createMatchHtml(appState.matches['r1_m1'], 1, 1, true)}</div></div></div>`;
             } else {
                 html += '<div class="split-bracket">';
-                html += `<div id="zoomWrapper" class="zoom-wrapper" style="display: flex; gap: 30px; position: relative; transform: scale(${currentZoom}); transform-origin: top center; transition: transform 0.2s ease; width: max-content; padding: 10px 40px;">`;
+                html += `<div id="zoomWrapper" class="zoom-wrapper" style="display: flex; gap: 30px; position: relative; transform: scale(${currentZoom}); transform-origin: top center; transition: transform 0.2s ease; width: max-content; padding: 40px;">`;
                 html += '<svg id="bracketLines" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;"></svg>';
                 
                 html += '<div class="bracket-side" style="flex-direction: row;">';
@@ -532,22 +532,35 @@
         if(!slider) return;
 
         let isDown = false;
-        let startX;
-        let scrollLeft;
+        let startX, startY;
+        let scrollLeft, scrollTop;
 
         slider.addEventListener('mousedown', (e) => {
             isDown = true;
+            slider.style.cursor = 'grabbing';
             startX = e.pageX - slider.offsetLeft;
+            startY = e.pageY - slider.offsetTop;
             scrollLeft = slider.scrollLeft;
+            scrollTop = slider.scrollTop;
         });
-        slider.addEventListener('mouseleave', () => isDown = false);
-        slider.addEventListener('mouseup', () => isDown = false);
+        
+        const stopDrag = () => {
+            isDown = false;
+            slider.style.cursor = 'grab';
+        };
+        
+        slider.addEventListener('mouseleave', stopDrag);
+        slider.addEventListener('mouseup', stopDrag);
+        
         slider.addEventListener('mousemove', (e) => {
             if (!isDown) return;
             e.preventDefault();
             const x = e.pageX - slider.offsetLeft;
-            const walk = (x - startX) * 2; // Множитель скорости скролла
-            slider.scrollLeft = scrollLeft - walk;
+            const y = e.pageY - slider.offsetTop;
+            const walkX = (x - startX) * 2; // Множитель скорости
+            const walkY = (y - startY) * 2; 
+            slider.scrollLeft = scrollLeft - walkX;
+            slider.scrollTop = scrollTop - walkY;
         });
 
         // Поддержка зума колесиком мыши (при зажатом Ctrl)
