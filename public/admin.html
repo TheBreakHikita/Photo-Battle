@@ -494,7 +494,13 @@
                     div.innerHTML = `<strong>Бой #${m}:</strong> ${getPlayerName(matchData.p1)} (Автопроход)`;
                 } else {
                     div.innerHTML = `
-                        <strong>Бой #${m}:</strong> 
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <strong>Бой #${m}:</strong>
+                            <label style="color: #ef4444; font-weight: bold; cursor: pointer; display: flex; align-items: center; gap: 5px; font-size: 0.9em; background: #fee2e2; padding: 4px 8px; border-radius: 6px;">
+                                <input type="checkbox" onchange="toggleActiveMatch(${r}, ${m}, this.checked)" ${matchData.isActive ? 'checked' : ''}>
+                                🔥 Идет сейчас
+                            </label>
+                        </div>
                         <button class="winner-btn ${matchData.winner === matchData.p1 && matchData.p1 ? 'active' : ''}" 
                                 onclick="setWinner(${r}, ${m}, '${matchData.p1}')" ${!matchData.p1 ? 'disabled' : ''}>Победа: ${getPlayerName(matchData.p1)}</button>
                         <button class="winner-btn ${matchData.winner === matchData.p2 && matchData.p2 ? 'active' : ''}" 
@@ -523,6 +529,11 @@
         
         appState.matches[`r${nextRound}_m${nextMatch}`][slot] = playerId;
         appState.matches[`r${nextRound}_m${nextMatch}`].winner = null; // Сброс победителя след. матча
+    }
+
+    // Сохраняем статус активного боя
+    function toggleActiveMatch(round, matchNum, isChecked) {
+        appState.matches[`r${round}_m${matchNum}`].isActive = isChecked;
     }
 
     // --- ОСТАЛЬНЫЕ ФУНКЦИИ (Бои, Организаторы, Сохранение) ---
