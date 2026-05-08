@@ -19,7 +19,7 @@
         .status-badge { display: table; margin: 0 auto 40px; padding: 8px 16px; background: rgba(59, 130, 246, 0.2); color: var(--accent); border-radius: 20px; font-weight: bold; }
         
         /* Active Battle */
-        .battle-section { background: var(--surface); border-radius: 16px; padding: 40px 20px; text-align: center; margin-bottom: 60px; }
+        .battle-section { position: relative; background: var(--surface); border-radius: 16px; padding: 40px 20px; text-align: center; margin-bottom: 60px; }
         .photos { display: flex; justify-content: center; align-items: center; gap: 30px; margin: 30px 0; flex-wrap: wrap; }
         .photo-wrapper { position: relative; width: 100%; max-width: 300px; }
         .photos img { width: 100%; aspect-ratio: 3/4; object-fit: cover; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
@@ -35,6 +35,10 @@
             .btn { width: 100%; padding: 15px 20px; font-size: 1rem; }
             .status-badge { font-size: 0.9em; text-align: center; }
             h1 { font-size: 1.8em; }
+            .battle-timer {
+                position: static; display: table;
+                margin: 10px auto 20px auto;
+            }
         }
         /* Battle Status Badges */
         .b-badge { display: inline-block; padding: 6px 12px; border-radius: 12px; font-size: 0.85em; font-weight: bold; margin-top: 10px; margin-bottom: 10px; letter-spacing: 0.5px; }
@@ -51,8 +55,9 @@
 
         /* Таймер боя */
         .battle-timer {
+            position: absolute; top: 20px; right: 20px; z-index: 10;
             display: inline-block; font-size: 1.1em; font-weight: bold; color: #f59e0b;
-            margin: 10px 0 20px 0; padding: 8px 16px; background: rgba(245, 158, 11, 0.1);
+            padding: 8px 16px; background: rgba(245, 158, 11, 0.1);
             border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 20px;
         }
         .battle-timer.expired {
@@ -180,7 +185,7 @@
                 const btnClass = isActive ? 'btn' : 'btn finished';
 
                 const timerHtml = (isActive && battle.endTime) 
-                    ? `<br><div class="battle-timer" data-endtime="${battle.endTime}">⏳ Вычисляем время...</div>` 
+                    ? `<div class="battle-timer" data-endtime="${battle.endTime}">⏳ Вычисляем время...</div>` 
                     : '';
 
                 // HTML профилей под фото
