@@ -76,6 +76,22 @@
         .org-card { background: var(--surface); padding: 20px; border-radius: 12px; width: 250px; text-align: center; }
         .org-card h3 { margin: 10px 0 5px; }
         .org-card a { color: var(--accent); text-decoration: none; }
+        /* Модальное окно почты */
+        .mail-section { text-align: center; margin-bottom: 60px; padding: 30px; background: rgba(59, 130, 246, 0.05); border: 1px dashed var(--accent); border-radius: 16px; }
+        .mail-section h2 { margin-bottom: 15px; color: var(--text); }
+        
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.8); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+        .modal-overlay.active { display: flex; }
+        .modal-content { background: var(--surface); width: 90%; max-width: 500px; padding: 30px; border-radius: 16px; position: relative; box-shadow: 0 10px 30px rgba(0,0,0,0.5); animation: fadeInScale 0.3s ease; }
+        .close-modal { position: absolute; top: 15px; right: 20px; font-size: 1.5em; cursor: pointer; color: var(--text-muted); transition: 0.2s; }
+        .close-modal:hover { color: var(--danger); }
+        
+        .modal-form { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
+        .modal-form label { font-size: 0.9em; color: var(--text-muted); text-align: left; }
+        .modal-form input, .modal-form textarea { width: 100%; padding: 12px; background: var(--bg); border: 1px solid #334155; border-radius: 8px; color: white; font-size: 1em; box-sizing: border-box; }
+        .modal-form input:focus, .modal-form textarea:focus { border-color: var(--accent); outline: none; }
+        .captcha-box { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; }
+        .captcha-text { font-weight: bold; font-size: 1.2em; color: var(--winner); letter-spacing: 2px; }
         /* Empty State (Заглушка) */
         .empty-state h2 { font-size: 2.5em; line-height: 1.3; margin-bottom: 20px; color: var(--text); }
         .empty-state .btn-news { background: #f59e0b; box-shadow: 0 10px 20px rgba(245, 158, 11, 0.3); padding: 18px 40px; font-size: 1.2em; display: inline-block; margin-top: 15px; }
@@ -131,6 +147,38 @@
     <!-- Контейнер для всех боев -->
     <div id="battlesContainer"></div>
 
+    <!-- Анонимная почта -->
+    <section class="mail-section">
+        <h2>✉️ Анонимная почта</h2>
+        <p style="color: var(--text-muted); margin-bottom: 20px;">Хочешь передать что-то организаторам или участникам?</p>
+        <button class="btn" onclick="openMailModal()" style="background: #10b981;">Написать сообщение</button>
+    </section>
+
+    <!-- Модалка почты -->
+    <div class="modal-overlay" id="mailModal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeMailModal()">✖</span>
+            <h2 style="color: var(--accent);">Отправить письмо</h2>
+            <form class="modal-form" id="mailForm" onsubmit="submitMail(event)">
+                <div>
+                    <label>Ваше имя / Никнейм (необязательно)</label>
+                    <input type="text" id="mailName" placeholder="Оставьте пустым для анонимности">
+                </div>
+                <div>
+                    <label>Сообщение (до 1000 символов) *</label>
+                    <textarea id="mailMessage" rows="5" maxlength="1000" placeholder="Напишите всё, что думаете..." required></textarea>
+                </div>
+                <div class="captcha-box">
+                    <label style="margin: 0;">Решите пример:</label>
+                    <span class="captcha-text" id="captchaTask">5 + 3 =</span>
+                    <input type="number" id="captchaAnswer" required style="width: 80px; text-align: center;">
+                </div>
+                <button type="submit" class="btn" id="mailSubmitBtn" style="width: 100%; margin-top: 10px;">Отправить</button>
+                <div id="mailStatus" style="text-align: center; margin-top: 10px; font-weight: bold;"></div>
+            </form>
+        </div>
+    </div>
+    
     <!-- Организаторы -->
     <section>
         <h2>Организаторы</h2>
@@ -267,6 +315,71 @@
                     <a href="${org.link}" target="_blank">${org.name}</a>
                 </div>`;
             });
+        }
+    }
+
+// --- Логика Анонимной Почты ---
+    let expectedCaptcha = 0;
+
+    function openMailModal() {
+        document.getElementById('mailModal').classList.add('active');
+        document.getElementById('mailStatus').innerText = '';
+        generateCaptcha();
+    }
+
+    function closeMailModal() {
+        document.getElementById('mailModal').classList.remove('active');
+        document.getElementById('mailForm').reset();
+    }
+
+    function generateCaptcha() {
+        const num1 = Math.floor(Math.random() * 10) + 1;
+        const num2 = Math.floor(Math.random() * 10) + 1;
+        expectedCaptcha = num1 + num2;
+        document.getElementById('captchaTask').innerText = `${num1} + ${num2} = `;
+    }
+
+    async function submitMail(e) {
+        e.preventDefault();
+        const btn = document.getElementById('mailSubmitBtn');
+        const status = document.getElementById('mailStatus');
+        
+        const answer = parseInt(document.getElementById('captchaAnswer').value);
+        if (answer !== expectedCaptcha) {
+            status.style.color = '#ef4444';
+            status.innerText = '❌ Неверный ответ в примере!';
+            generateCaptcha();
+            return;
+        }
+
+        const name = document.getElementById('mailName').value.trim();
+        const message = document.getElementById('mailMessage').value.trim();
+
+        btn.disabled = true;
+        btn.innerText = 'Отправка...';
+
+        try {
+            const res = await fetch('/api/mail', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, message })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                status.style.color = '#10b981';
+                status.innerText = '✅ Письмо успешно отправлено!';
+                setTimeout(closeMailModal, 2000);
+            } else {
+                throw new Error(data.error || 'Ошибка сервера');
+            }
+        } catch (err) {
+            status.style.color = '#ef4444';
+            status.innerText = `❌ ${err.message}`;
+            generateCaptcha();
+        } finally {
+            btn.disabled = false;
+            btn.innerText = 'Отправить';
         }
     }
 

@@ -77,6 +77,12 @@
 
         .winner-btn { margin: 5px; padding: 8px 12px; border: 1px solid #ccc; background: white; border-radius: 4px; cursor: pointer; }
         .winner-btn.active { background: var(--success); color: white; border-color: var(--success); }
+        /* Стили для почты */
+        .mail-card { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid #10b981; border-radius: 8px; padding: 15px; margin-bottom: 15px; position: relative; }
+        .mail-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.9em; color: #64748b; }
+        .mail-author { font-weight: bold; color: var(--text); font-size: 1.1em; }
+        .mail-body { background: #f8fafc; padding: 15px; border-radius: 6px; white-space: pre-wrap; color: #334155; font-size: 0.95em; border: 1px solid #e2e8f0; }
+        .mail-delete { position: absolute; bottom: 15px; right: 15px; }
 
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
@@ -119,6 +125,7 @@
             <div class="menu-item" onclick="switchTab('tab-main')">🏠 Главная страница</div>
             <div class="menu-item" onclick="switchTab('tab-tournament')">🏆 Турнирная сетка</div>
             <div class="menu-item" onclick="switchTab('tab-info')">ℹ️ Страница Инфо</div>
+            <div class="menu-item" onclick="switchTab('tab-mail')">✉️ Анонимная почта</div>
         </div>
     </aside>
 
@@ -233,6 +240,19 @@
 
                 <h2 style="margin-top: 30px;">Организаторы</h2>
                 <div id="organizersAdminContainer"></div>
+            </section>
+            <!-- Вкладка 5: АНОНИМНАЯ ПОЧТА -->
+            <section id="tab-mail" class="tab-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 style="margin: 0; border: none;">✉️ Входящие сообщения</h2>
+                    <div>
+                        <button class="btn btn-outline" onclick="loadMail()" style="margin-right: 10px;">🔄 Обновить</button>
+                        <button class="btn btn-danger" onclick="deleteAllMail()">🗑 Удалить всё</button>
+                    </div>
+                </div>
+                <div id="mailAdminContainer">
+                    <p style="color: #64748b;">Загрузка сообщений...</p>
+                </div>
             </section>
 
         </div>
@@ -362,6 +382,7 @@
         renderBattles();
         renderOrganizers();
         renderInfoBlocks(); // Отрисовка новых инфо-блоков
+        loadMail(); // Загрузка писем
     }
 
     // --- УЧАСТНИКИ ---
@@ -737,6 +758,66 @@
     }
 
 // loadData() вызывается внутри showAdmin() после проверки токена
+// --- АНОНИМНАЯ ПОЧТА (АДМИН) ---
+    async function loadMail() {
+        const container = document.getElementById('mailAdminContainer');
+        container.innerHTML = '<p style="color: #64748b;">Загрузка сообщений...</p>';
+        
+        try {
+            const res = await fetch('/api/mail', { headers: { 'Authorization': `Bearer ${authToken}` } });
+            const mails = await res.json();
+            
+            if (res.status === 401) return; // Сессия истекла
+
+            if (!mails || mails.length === 0) {
+                container.innerHTML = '<div class="admin-block" style="text-align: center; color: #64748b;">📭 Входящих сообщений пока нет.</div>';
+                return;
+            }
+
+            container.innerHTML = '';
+            mails.forEach(mail => {
+                const date = new Date(mail.created_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                container.innerHTML += `
+                    <div class="mail-card" id="mail-${mail.id}">
+                        <div class="mail-header">
+                            <span class="mail-author">👤 ${mail.name}</span>
+                            <span>🕒 ${date} | IP: ${mail.ip.substring(0, 15)}</span>
+                        </div>
+                        <div class="mail-body">${mail.message}</div>
+                        <button class="btn btn-danger mail-delete" style="padding: 5px 10px; font-size: 0.8em;" onclick="deleteMail('${mail.id}')">Удалить</button>
+                    </div>
+                `;
+            });
+        } catch (e) {
+            container.innerHTML = `<p style="color: #ef4444;">Ошибка загрузки почты: ${e.message}</p>`;
+        }
+    }
+
+    async function deleteMail(id) {
+        if (!confirm('Удалить это сообщение?')) return;
+        const res = await fetch(`/api/mail/${id}`, { 
+            method: 'DELETE', 
+            headers: { 'Authorization': `Bearer ${authToken}` } 
+        });
+        if (res.ok) {
+            document.getElementById(`mail-${id}`).remove();
+        } else {
+            alert('Ошибка при удалении');
+        }
+    }
+
+    async function deleteAllMail() {
+        if (!confirm('ВНИМАНИЕ! Вы точно хотите удалить ВСЕ сообщения? Это действие необратимо.')) return;
+        const res = await fetch('/api/mail', { 
+            method: 'DELETE', 
+            headers: { 'Authorization': `Bearer ${authToken}` } 
+        });
+        if (res.ok) {
+            loadMail();
+        } else {
+            alert('Ошибка при очистке почты');
+        }
+    }
 </script>
 </body>
 </html>

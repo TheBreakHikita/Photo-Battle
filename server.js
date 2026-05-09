@@ -40,6 +40,73 @@ app.post('/api/track', async (req, res) => {
     }
 });
 
+// --- АНОНИМНАЯ ПОЧТА ---
+// Отправка письма (публичный доступ)
+app.post('/api/mail', async (req, res) => {
+    const { name, message, captchaToken } = req.body;
+    // Получаем IP пользователя
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+    if (!message || message.length > 1000) {
+        return res.status(400).json({ error: 'Сообщение не должно быть пустым и превышать 1000 символов' });
+    }
+
+    try {
+        // Проверка лимита: 1 сообщение в 24 часа с одного IP
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const { data: recentMail } = await supabase
+            .from('anonymous_mail')
+            .select('id')
+            .eq('ip', ip)
+            .gte('created_at', yesterday);
+
+        if (recentMail && recentMail.length > 0) {
+            return res.status(429).json({ error: 'Вы уже отправляли сообщение сегодня. Попробуйте завтра!' });
+        }
+
+        // Сохранение в БД
+        const { error } = await supabase.from('anonymous_mail').insert([
+            { name: name || 'Аноним', message: message, ip: ip }
+        ]);
+
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Получение всех писем (только админ)
+app.get('/api/mail', async (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token || !authTokens.has(token)) return res.status(401).json({ error: "Не авторизован" });
+
+    const { data, error } = await supabase.from('anonymous_mail').select('*').order('created_at', { ascending: false });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json(data);
+});
+
+// Удаление одного письма (только админ)
+app.delete('/api/mail/:id', async (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token || !authTokens.has(token)) return res.status(401).json({ error: "Не авторизован" });
+
+    const { error } = await supabase.from('anonymous_mail').delete().eq('id', req.params.id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+});
+
+// Удаление всех писем (только админ)
+app.delete('/api/mail', async (req, res) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token || !authTokens.has(token)) return res.status(401).json({ error: "Не авторизован" });
+
+    // Удаляем всё, где id не равен null (то есть вообще всё)
+    const { error } = await supabase.from('anonymous_mail').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+});
+
 // Авторизация админа
 app.post('/api/login', (req, res) => {
     if (req.body.password === ADMIN_PASSWORD) {
