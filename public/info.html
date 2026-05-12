@@ -18,6 +18,17 @@
         .back-btn:hover { background: #475569; }
 
         h1 { text-align: center; margin-bottom: 30px; font-size: 2.2em; color: var(--accent); }
+        /* Skeleton Loading */
+        @keyframes shimmer {
+            0% { background-position: -800px 0; }
+            100% { background-position: 800px 0; }
+        }
+        .skeleton {
+            background-color: #334155;
+            background-image: linear-gradient(90deg, #334155 0px, #475569 50%, #334155 100%);
+            background-size: 800px 100%;
+            animation: shimmer 1.5s infinite linear;
+        }
         
         /* Стили для сворачивающихся блоков */
         .info-block { background: #0f172a; border: 1px solid #334155; border-radius: 12px; margin-bottom: 15px; overflow: hidden; }
@@ -56,7 +67,16 @@
 <div class="container">
     <a href="/" class="back-btn">⬅ Назад на главную</a>
     
-    <div id="loading">Загрузка информации...</div>
+    <div id="loading">
+        <!-- Скелетная загрузка (скроется сама при загрузке) -->
+        <div class="skeleton" style="height: 40px; width: 60%; max-width: 300px; margin: 0 auto 30px; border-radius: 8px;"></div>
+        <div class="skeleton" style="height: 60px; width: 100%; margin-bottom: 15px; border-radius: 12px;"></div>
+        <div class="skeleton" style="height: 60px; width: 100%; margin-bottom: 15px; border-radius: 12px;"></div>
+        <div class="skeleton" style="height: 60px; width: 100%; margin-bottom: 30px; border-radius: 12px;"></div>
+        <div style="text-align: center; border-top: 1px solid #334155; padding-top: 40px;">
+            <div class="skeleton" style="height: 55px; width: 220px; margin: 0 auto; border-radius: 30px;"></div>
+        </div>
+    </div>
     
     <div id="content">
         <h1>Информация об ивенте</h1>

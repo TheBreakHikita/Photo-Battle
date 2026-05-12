@@ -15,6 +15,19 @@
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
         
         /* Typography */
+        /* Skeleton Loading */
+        @keyframes shimmer {
+            0% { background-position: -800px 0; }
+            100% { background-position: 800px 0; }
+        }
+        .skeleton {
+            background-color: #334155 !important;
+            background-image: linear-gradient(90deg, #334155 0px, #475569 50%, #334155 100%) !important;
+            background-size: 800px 100% !important;
+            animation: shimmer 1.5s infinite linear !important;
+            color: transparent !important;
+            border: none !important;
+        }
         h1, h2 { text-align: center; margin-bottom: 10px; }
         .status-badge { display: table; margin: 0 auto 40px; padding: 8px 16px; background: rgba(59, 130, 246, 0.2); color: var(--accent); border-radius: 20px; font-weight: bold; }
         
@@ -64,11 +77,19 @@
         
         /* Эффект победителя */
         .photo-wrapper.winner img {
-            border: 4px solid var(--winner); box-shadow: 0 0 30px rgba(34, 197, 94, 0.7);
+            border: 4px solid var(--winner); 
+            animation: photoPulse 2s infinite;
         }
         .winner-crown {
             position: absolute; top: -25px; right: -20px; font-size: 4rem; z-index: 10;
-            filter: drop-shadow(0 5px 10px rgba(0,0,0,0.5)); animation: pulse 2s infinite;
+            filter: drop-shadow(0 5px 15px rgba(0,0,0,0.6));
+        }
+
+        /* Улучшенная двойная пульсация для фотографии победителя */
+        @keyframes photoPulse {
+            0% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.6), 0 0 0 0 rgba(34, 197, 94, 0.4); }
+            70% { box-shadow: 0 0 40px rgba(34, 197, 94, 0.9), 0 0 0 15px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.6), 0 0 0 0 rgba(34, 197, 94, 0); }
         }
 
         /* Organizers */
@@ -132,7 +153,7 @@
 
 <div class="container">
     <h1>Фото Батл</h1>
-    <div id="statusBadge" class="status-badge">Загрузка...</div>
+    <div id="statusBadge" class="status-badge skeleton" style="border-radius: 20px;">Загрузка...</div>
 
     <!-- Кнопки перехода -->
     <div style="text-align: center; margin-bottom: 50px; display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
@@ -145,7 +166,19 @@
     </div>
 
     <!-- Контейнер для всех боев -->
-    <div id="battlesContainer"></div>
+    <div id="battlesContainer">
+        <!-- Скелетная загрузка -->
+        <section class="battle-section" style="pointer-events: none;">
+            <div class="skeleton" style="height: 35px; width: 50%; max-width: 300px; margin: 0 auto 15px; border-radius: 8px;"></div>
+            <div class="skeleton" style="height: 28px; width: 180px; margin: 0 auto 30px; border-radius: 15px;"></div>
+            <div class="photos">
+                <div class="photo-wrapper"><div class="skeleton" style="width: 100%; aspect-ratio: 3/4; border-radius: 12px;"></div></div>
+                <div class="skeleton" style="width: 70px; height: 70px; border-radius: 50%; flex-shrink: 0;"></div>
+                <div class="photo-wrapper"><div class="skeleton" style="width: 100%; aspect-ratio: 3/4; border-radius: 12px;"></div></div>
+            </div>
+            <div class="skeleton" style="height: 55px; width: 280px; margin: 0 auto; border-radius: 30px;"></div>
+        </section>
+    </div>
 
     <!-- Анонимная почта -->
     <section class="mail-section" id="mailSectionBlock">
@@ -229,6 +262,11 @@
     }
 
     function render(state) {
+        // Убираем скелетную загрузку с бейджа
+        const badge = document.getElementById('statusBadge');
+        badge.classList.remove('skeleton');
+        badge.style.color = '';
+        
         // Установка бейджа
         setTimeout(updateTimers, 50); // Вызов таймера сразу после отрисовки
         // Логика отображения блока почты и таймера
@@ -291,6 +329,13 @@
                 const w1Class = isW1 ? 'winner' : '';
                 const w2Class = isW2 ? 'winner' : '';
 
+                // Красивая SVG-заглушка с вопросительным знаком для пустых фото
+                const defaultImg = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='400' viewBox='0 0 300 400'%3E%3Crect width='300' height='400' fill='%23334155'/%3E%3Ctext x='50%25' y='50%25' font-family='sans-serif' font-size='100' font-weight='bold' fill='%2394a3b8' text-anchor='middle' dominant-baseline='middle'%3E?%3C/text%3E%3C/svg%3E";
+                
+                // Проверяем: если фото есть - используем его, если пусто - ставим заглушку
+                const img1 = battle.photo1 && battle.photo1.trim() !== '' ? battle.photo1 : defaultImg;
+                const img2 = battle.photo2 && battle.photo2.trim() !== '' ? battle.photo2 : defaultImg;
+
                 battlesContainer.innerHTML += `
                 <section class="battle-section">
                     <h2>${battle.title}</h2>
@@ -299,13 +344,13 @@
                     <div class="photos">
                         <div class="photo-wrapper ${w1Class}">
                             ${w1Crown}
-                            <img src="${battle.photo1}" alt="1">
+                            <img src="${img1}" alt="Участник 1">
                             ${p1Html}
                         </div>
                         <div class="vs">VS</div>
                         <div class="photo-wrapper ${w2Class}">
                             ${w2Crown}
-                            <img src="${battle.photo2}" alt="2">
+                            <img src="${img2}" alt="Участник 2">
                             ${p2Html}
                         </div>
                     </div>
