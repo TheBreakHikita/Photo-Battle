@@ -410,6 +410,7 @@
 
     // Функция обновления таймеров
     function updateTimers() {
+        // 1. Таймеры для активных боев
         document.querySelectorAll('.battle-timer').forEach(el => {
             const endTimeStr = el.getAttribute('data-endtime');
             if (!endTimeStr) return;
@@ -435,8 +436,8 @@
             
             el.innerHTML = timeStr;
         });
-    }
-    // Живой таймер для анонимной почты
+
+        // 2. Живой таймер для анонимной почты (теперь внутри функции)
         const mailTimerEl = document.getElementById('mailCountdown');
         if (mailTimerEl) {
             const endTimeStr = mailTimerEl.getAttribute('data-mail-endtime');
@@ -463,6 +464,7 @@
                 }
             }
         }
+    } // Конец функции updateTimers
 
     // Запускаем обновление таймеров каждую секунду
     setInterval(updateTimers, 1000);
