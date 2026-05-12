@@ -148,8 +148,9 @@
     <div id="battlesContainer"></div>
 
     <!-- Анонимная почта -->
-    <section class="mail-section">
+    <section class="mail-section" id="mailSectionBlock">
         <h2>✉️ Анонимная почта</h2>
+        <div id="mailTimerContainer"></div>
         <p style="color: var(--text-muted); margin-bottom: 20px;">Хочешь передать что-то организаторам или участникам?</p>
         <button class="btn" onclick="openMailModal()" style="background: #10b981;">Написать сообщение</button>
     </section>
@@ -230,6 +231,30 @@
     function render(state) {
         // Установка бейджа
         setTimeout(updateTimers, 50); // Вызов таймера сразу после отрисовки
+        // Логика отображения блока почты и таймера
+        const mailBlock = document.getElementById('mailSectionBlock');
+        const mailTimerContainer = document.getElementById('mailTimerContainer');
+        
+        if (mailBlock) {
+            let showMail = state.mailEnabled !== false; // Главный переключатель
+            let timerHtml = '';
+
+            // Если почта включена, проверяем таймер
+            if (showMail && state.mailTimerEnabled && state.mailEndTime) {
+                const end = new Date(state.mailEndTime).getTime();
+                const now = new Date().getTime();
+                
+                if (now >= end) {
+                    showMail = false; // Время вышло - скрываем полностью
+                } else {
+                    // Рисуем таймер (стилизуем так, чтобы он красиво висел по центру)
+                    timerHtml = `<div class="battle-timer" id="mailCountdown" data-mail-endtime="${state.mailEndTime}" style="position: relative; top: auto; right: auto; margin: 10px auto 20px auto; display: table;">⏳ Вычисляем время...</div>`;
+                }
+            }
+
+            mailBlock.style.display = showMail ? 'block' : 'none';
+            if (mailTimerContainer) mailTimerContainer.innerHTML = timerHtml;
+        }
         document.getElementById('statusBadge').innerText = state.heroStatus;
         if (state.mode === 'presentation') {
             document.getElementById('statusBadge').style.background = 'rgba(255,255,255,0.1)';
@@ -411,6 +436,33 @@
             el.innerHTML = timeStr;
         });
     }
+    // Живой таймер для анонимной почты
+        const mailTimerEl = document.getElementById('mailCountdown');
+        if (mailTimerEl) {
+            const endTimeStr = mailTimerEl.getAttribute('data-mail-endtime');
+            if (endTimeStr) {
+                const end = new Date(endTimeStr).getTime();
+                const now = new Date().getTime();
+                const diff = end - now;
+
+                if (diff <= 0) {
+                    // Время вышло прямо сейчас! Полностью скрываем блок почты
+                    const mailBlock = document.getElementById('mailSectionBlock');
+                    if (mailBlock) mailBlock.style.display = 'none';
+                } else {
+                    const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+                    const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                    const s = Math.floor((diff % (1000 * 60)) / 1000);
+
+                    let timeStr = '⏳ До закрытия почты: ';
+                    if (d > 0) timeStr += `${d}д `;
+                    timeStr += `${h.toString().padStart(2, '0')}ч ${m.toString().padStart(2, '0')}м ${s.toString().padStart(2, '0')}с`;
+                    
+                    mailTimerEl.innerHTML = timeStr;
+                }
+            }
+        }
 
     // Запускаем обновление таймеров каждую секунду
     setInterval(updateTimers, 1000);

@@ -250,6 +250,24 @@
                         <button class="btn btn-danger" onclick="deleteAllMail()">🗑 Удалить всё</button>
                     </div>
                 </div>
+                <div class="admin-block border-left-blue" style="margin-bottom: 20px;">
+                    <div class="form-group" style="display: flex; align-items: center; gap: 10px; margin: 0;">
+                        <input type="checkbox" id="mailEnabledToggle" style="width: 20px; height: 20px; cursor: pointer;">
+                        <label for="mailEnabledToggle" style="margin: 0; cursor: pointer; font-size: 1.1em;">Включить блок "Анонимная почта" на главной странице</label>
+                    </div>
+                    <p style="font-size: 0.85em; color: #64748b; margin: 5px 0 0 30px;">Снимите галочку, чтобы полностью скрыть блок отправки писем от пользователей.</p>
+                    
+                    <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                            <input type="checkbox" id="mailTimerToggle" style="width: 20px; height: 20px; cursor: pointer;">
+                            <label for="mailTimerToggle" style="margin: 0; cursor: pointer; font-weight: bold;">Отключить почту автоматически по таймеру</label>
+                        </div>
+                        <div style="margin-left: 30px;">
+                            <label>Дата и время закрытия:</label>
+                            <input type="datetime-local" id="mailEndTime" style="max-width: 250px; cursor: pointer;">
+                        </div>
+                    </div>
+                </div>
                 <div id="mailAdminContainer">
                     <p style="color: #64748b;">Загрузка сообщений...</p>
                 </div>
@@ -352,6 +370,12 @@
         if(!appState.fallback) {
             appState.fallback = { btnText: "Следите за новостями тут", btnLink: "" };
         }
+        // Инициализация статуса почты (по умолчанию включена)
+        if(appState.mailEnabled === undefined) {
+            appState.mailEnabled = true;
+        }
+        if(appState.mailTimerEnabled === undefined) appState.mailTimerEnabled = false;
+        if(appState.mailEndTime === undefined) appState.mailEndTime = "";
             if (appState.eventInfo.title || appState.eventInfo.description) {
                 appState.eventInfo.blocks.push({
                     id: 'ib' + Date.now(),
@@ -371,6 +395,9 @@
         document.getElementById('infoBtnLink').value = appState.eventInfo.buttonLink || '';
         document.getElementById('fallbackBtnText').value = appState.fallback?.btnText || '';
         document.getElementById('fallbackBtnLink').value = appState.fallback?.btnLink || '';
+        document.getElementById('mailEnabledToggle').checked = appState.mailEnabled;
+        document.getElementById('mailTimerToggle').checked = appState.mailTimerEnabled || false;
+        document.getElementById('mailEndTime').value = appState.mailEndTime || '';
         // Отрисовка статистики
         document.getElementById('statTotal').innerText = appState.analytics.total || 0;
         document.getElementById('statIndex').innerText = appState.analytics.index || 0;
@@ -737,6 +764,10 @@
             btnText: document.getElementById('fallbackBtnText').value,
             btnLink: document.getElementById('fallbackBtnLink').value
         };
+        // Сохраняем состояние переключателя почты
+        appState.mailEnabled = document.getElementById('mailEnabledToggle').checked;
+        appState.mailTimerEnabled = document.getElementById('mailTimerToggle').checked;
+        appState.mailEndTime = document.getElementById('mailEndTime').value;
 
         const res = await fetch('/api/state', {
             method: 'POST',
