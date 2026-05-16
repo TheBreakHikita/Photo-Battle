@@ -631,6 +631,8 @@
                         </select>
                         <label>Фото 1 (ссылка):</label><input type="text" class="b-p1" value="${b.photo1}">
                     </div>
+                    <label style="margin-top: 10px; color: #3b82f6;">Голоса / Проценты:</label>
+                        <input type="number" class="b-votes1" value="${b.votes1 || ''}" placeholder="Например: 1540">
                     <div style="flex: 1; min-width: 250px; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #ccc;">
                         <label>Участник 2 (под правым фото):</label>
                         <select class="b-p2-id" style="margin-bottom: 10px;">
@@ -638,6 +640,8 @@
                         </select>
                         <label>Фото 2 (ссылка):</label><input type="text" class="b-p2" value="${b.photo2}">
                     </div>
+                    <label style="margin-top: 10px; color: #ef4444;">Голоса / Проценты:</label>
+                        <input type="number" class="b-votes2" value="${b.votes2 || ''}" placeholder="Например: 890">
                 </div>
 
                 <div class="form-group" style="background: rgba(34, 197, 94, 0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3);">
@@ -654,7 +658,7 @@
         });
     }
 
-    function addBattle() { appState.battles.push({ id: 'b' + Date.now(), title: "Новый бой", photo1: "", photo2: "", link: "", status: "active", endTime: "", participant1: "", participant2: "", winner: "" }); renderBattles(); }
+    function addBattle() { appState.battles.push({ id: 'b' + Date.now(), title: "Новый бой", photo1: "", photo2: "", link: "", status: "active", endTime: "", participant1: "", participant2: "", winner: "", votes1: "", votes2: "" }); renderBattles(); }
     function removeBattle(id) { appState.battles = appState.battles.filter(b => b.id !== id); renderBattles(); }
     function resetBattleReactions(id) {
         if(!confirm('Очистить все реакции для этого боя?')) return;
@@ -677,7 +681,9 @@
             winner: block.querySelector('.b-winner').value,
             photo1: block.querySelector('.b-p1').value, 
             photo2: block.querySelector('.b-p2').value, 
-            link: block.querySelector('.b-link').value
+            link: block.querySelector('.b-link').value,
+            votes1: block.querySelector('.b-votes1').value,
+            votes2: block.querySelector('.b-votes2').value
         }));
     }
 

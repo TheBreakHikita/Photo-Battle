@@ -168,6 +168,39 @@
         .empty-state h2 { font-size: 2.5em; line-height: 1.3; margin-bottom: 20px; color: var(--text); }
         .empty-state .btn-news { background: #f59e0b; box-shadow: 0 10px 20px rgba(245, 158, 11, 0.3); padding: 18px 40px; font-size: 1.2em; display: inline-block; margin-top: 15px; }
         .empty-state .btn-news:hover { background: #d97706; transform: translateY(-3px); box-shadow: 0 15px 25px rgba(245, 158, 11, 0.4); }
+        /* Шкала результатов (Progress Bar) */
+        .results-container {
+            width: 100%; max-width: 800px; margin: 30px auto 20px;
+            background: rgba(15, 23, 42, 0.6); border-radius: 20px;
+            padding: 20px; text-align: center; border: 1px solid #334155;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            animation: fadeInScale 0.5s ease;
+        }
+        .results-bar-wrapper {
+            display: flex; height: 30px; width: 100%;
+            border-radius: 15px; overflow: hidden; background: #1e293b;
+            box-shadow: inset 0 3px 6px rgba(0,0,0,0.6); margin: 15px 0;
+        }
+        .results-bar-p1 {
+            height: 100%; background: linear-gradient(90deg, #2563eb, #60a5fa);
+            display: flex; align-items: center; justify-content: flex-start;
+            padding-left: 15px; color: white; font-weight: 900; font-size: 1em;
+            transition: width 1.5s cubic-bezier(0.25, 1, 0.5, 1);
+            box-shadow: inset -2px 0 5px rgba(0,0,0,0.2);
+        }
+        .results-bar-p2 {
+            height: 100%; background: linear-gradient(90deg, #e11d48, #fb7185);
+            display: flex; align-items: center; justify-content: flex-end;
+            padding-right: 15px; color: white; font-weight: 900; font-size: 1em;
+            transition: width 1.5s cubic-bezier(0.25, 1, 0.5, 1);
+            box-shadow: inset 2px 0 5px rgba(0,0,0,0.2);
+        }
+        .results-stats {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 1.1em; font-weight: bold; color: var(--text); padding: 0 10px;
+        }
+        .stat-p1 { color: #60a5fa; }
+        .stat-p2 { color: #fb7185; }
         /* Универсальная мобильная адаптация (обязательно в самом низу) */
         @media (max-width: 768px) { 
             .empty-state h2 { font-size: 1.8em; }
@@ -514,6 +547,37 @@
 
                 const topR1 = getTopReaction('1');
                 const topR2 = getTopReaction('2');
+                // --- Шкала результатов ---
+                let resultsHtml = '';
+                // Показываем шкалу, если админ ввел цифры (оба поля заполнены)
+                if (battle.votes1 && battle.votes2) {
+                    const v1 = parseFloat(battle.votes1) || 0;
+                    const v2 = parseFloat(battle.votes2) || 0;
+                    const total = v1 + v2;
+                    
+                    if (total > 0) {
+                        // Округляем до 1 знака после запятой, чтобы было точно
+                        let p1Pct = (v1 / total * 100).toFixed(1);
+                        let p2Pct = (v2 / total * 100).toFixed(1);
+                        
+                        // Если цифры ровные (без дробей), убираем .0
+                        if (p1Pct.endsWith('.0')) p1Pct = parseInt(p1Pct);
+                        if (p2Pct.endsWith('.0')) p2Pct = parseInt(p2Pct);
+
+                        resultsHtml = `
+                        <div class="results-container">
+                            <div class="results-stats">
+                                <span class="stat-p1">Голосов: ${v1}</span>
+                                <span style="color: var(--text-muted); font-size: 0.85em; text-transform: uppercase; letter-spacing: 2px;">Результаты</span>
+                                <span class="stat-p2">Голосов: ${v2}</span>
+                            </div>
+                            <div class="results-bar-wrapper">
+                                <div class="results-bar-p1" style="width: ${p1Pct}%;">${p1Pct}%</div>
+                                <div class="results-bar-p2" style="width: ${p2Pct}%;">${p2Pct}%</div>
+                            </div>
+                        </div>`;
+                    }
+                }
 
                 battlesContainer.innerHTML += `
                 <section class="battle-section">
@@ -539,7 +603,8 @@
                             ${getReactHtml('2')}
                         </div>
                     </div>
-                    <a href="${battle.link}" class="${btnClass}" target="_blank">${btnText}</a>
+                    ${resultsHtml}
+                    <a href="${battle.link}" class="${btnClass}" target="_blank" style="margin-top: 10px;">${btnText}</a>
                 </section>`;
             });
         } else {
