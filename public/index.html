@@ -273,20 +273,87 @@
 
 <script>
     let lastStateHash = "";
+    let currentStateStrWithoutReactions = "";
 
     async function loadData() {
         try {
             const res = await fetch('/api/state');
             const state = await res.json();
-            const stateString = JSON.stringify(state);
-            
-            // Если состояние не изменилось, ничего не перерисовываем
-            if (stateString === lastStateHash) return;
-            
-            lastStateHash = stateString;
-            localStorage.setItem('battleCache', stateString); // Сохраняем для мгновенной загрузки в след. раз
-            render(state);
+            updateFromStream(state);
         } catch (e) { console.error("Ошибка обновления данных", e); }
+    }
+
+    function setupStream() {
+        const evtSource = new EventSource('/api/stream');
+        evtSource.onmessage = function(event) {
+            try {
+                const state = JSON.parse(event.data);
+                updateFromStream(state);
+            } catch(e) {}
+        };
+        evtSource.onerror = function() {
+            evtSource.close();
+            setTimeout(setupStream, 3000); // Переподключение при обрыве
+        };
+    }
+
+    function updateFromStream(state) {
+        const stateString = JSON.stringify(state);
+        if (stateString === lastStateHash) return;
+        
+        // Проверяем, изменилось ли что-то кроме реакций (структура боев и т.д.)
+        const coreState = { ...state };
+        delete coreState.reactions;
+        delete coreState.analytics;
+        const coreStr = JSON.stringify(coreState);
+
+        if (coreStr !== currentStateStrWithoutReactions) {
+            // Если изменился турнир или настройки — полная перерисовка
+            currentStateStrWithoutReactions = coreStr;
+            render(state);
+        } else {
+            // Если только реакции — обновляем цифры без перезагрузки DOM (плавно)
+            updateReactionsDOM(state.reactions);
+        }
+
+        lastStateHash = stateString;
+        localStorage.setItem('battleCache', stateString);
+    }
+
+    function updateReactionsDOM(reactions) {
+        if (!reactions) return;
+        for (const battleId in reactions) {
+            for (const part of ['1', '2']) {
+                const counts = reactions[battleId][part] || {};
+                let maxCount = 0;
+                let topReact = null;
+
+                // Обновляем цифры
+                for (const r in counts) {
+                    const c = counts[r];
+                    if (c > maxCount) { maxCount = c; topReact = r; }
+                    const btnCount = document.querySelector(`.reaction-btn[data-b="${battleId}"][data-p="${part}"][data-r="${r}"] .reaction-count`);
+                    if (btnCount) btnCount.innerText = c;
+                }
+
+                // Мгновенно обновляем корону-бейджик главной реакции
+                const wrapper = document.querySelector(`.photo-wrapper[data-b="${battleId}"][data-p="${part}"]`);
+                if (wrapper) {
+                    let badge = wrapper.querySelector('.top-reaction-badge');
+                    if (!badge && topReact) {
+                        badge = document.createElement('div');
+                        badge.className = 'top-reaction-badge';
+                        wrapper.insertBefore(badge, wrapper.querySelector('img') || wrapper.firstChild);
+                    }
+                    if (badge && badge.innerText !== topReact) {
+                        badge.innerText = topReact;
+                        badge.style.animation = 'none';
+                        badge.offsetHeight; // Сброс анимации
+                        badge.style.animation = 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+                    }
+                }
+            }
+        }
     }
 
     // Мгновенная загрузка из кэша
@@ -405,7 +472,7 @@
                     const reacts = ['🔥', '😎', '💀'];
                     return `<div class="reactions-container">` + reacts.map(r => {
                         const count = counts[r] || 0;
-                        return `<button class="reaction-btn" onclick="sendReaction(event, '${battle.id}', '${part}', '${r}')">${r} <span class="reaction-count">${count}</span></button>`;
+                        return `<button class="reaction-btn" data-b="${battle.id}" data-p="${part}" data-r="${r}" onclick="sendReaction(event, '${battle.id}', '${part}', '${r}')">${r} <span class="reaction-count">${count}</span></button>`;
                     }).join('') + `</div>`;
                 };
 
@@ -432,7 +499,7 @@
                     ${badgeHtml}
                     ${timerHtml}
                     <div class="photos">
-                        <div class="photo-wrapper ${w1Class}">
+                        <div class="photo-wrapper ${w1Class}" data-b="${battle.id}" data-p="1">
                             ${w1Crown}
                             ${topR1 ? `<div class="top-reaction-badge">${topR1}</div>` : ''}
                             <img src="${img1}" alt="Участник 1">
@@ -441,7 +508,7 @@
                             ${getReactHtml('1')}
                         </div>
                         <div class="vs">VS</div>
-                        <div class="photo-wrapper ${w2Class}">
+                        <div class="photo-wrapper ${w2Class}" data-b="${battle.id}" data-p="2">
                             ${w2Crown}
                             ${topR2 ? `<div class="top-reaction-badge">${topR2}</div>` : ''}
                             <img src="${img2}" alt="Участник 2">
@@ -549,43 +616,75 @@
         }
     }
 
+    let reactionQueue = {};
+    let reactionTimer = null;
+
     function sendReaction(event, battleId, participant, reaction) {
         const btn = event.currentTarget;
         
-        // Создаем вылетающий смайл прямо из-под пальца/курсора
+        // Эффект вылетающего смайла
         const emoji = document.createElement('div');
         emoji.className = 'floating-emoji';
         emoji.innerText = reaction;
         
-        let clientX = event.clientX;
-        let clientY = event.clientY;
-        if (event.touches && event.touches.length > 0) {
-            clientX = event.touches[0].clientX;
-            clientY = event.touches[0].clientY;
-        } else if (clientX === undefined) {
-            const rect = btn.getBoundingClientRect();
-            clientX = rect.left + rect.width / 2;
-            clientY = rect.top + rect.height / 2;
-        }
+        let clientX = event.clientX, clientY = event.clientY;
+        if (event.touches && event.touches.length > 0) { clientX = event.touches[0].clientX; clientY = event.touches[0].clientY; } 
+        else if (clientX === undefined) { const rect = btn.getBoundingClientRect(); clientX = rect.left + rect.width / 2; clientY = rect.top + rect.height / 2; }
 
-        emoji.style.left = clientX + 'px';
-        emoji.style.top = clientY + 'px';
+        emoji.style.left = clientX + 'px'; emoji.style.top = clientY + 'px';
         document.body.appendChild(emoji);
         setTimeout(() => emoji.remove(), 800);
 
-        // Анимация пульсации кнопки при нажатии (чтобы было приятно "закликивать")
         btn.style.transform = 'scale(0.85)';
         setTimeout(() => btn.style.transform = '', 100);
 
-        // Локально сразу прибавляем число для мгновенной обратной связи (теперь бесконечно)
+        // 1. Мгновенно обновляем счетчик у себя
         const countSpan = btn.querySelector('.reaction-count');
-        countSpan.innerText = parseInt(countSpan.innerText) + 1;
+        const newCount = parseInt(countSpan.innerText) + 1;
+        countSpan.innerText = newCount;
 
-        // Отправляем на сервер в фоне
-        fetch('/api/react', {
+        // 2. Мгновенно вычисляем и меняем главную реакцию визуально
+        const wrapper = btn.closest('.photo-wrapper');
+        let maxC = 0; let topReact = null;
+        wrapper.querySelectorAll('.reaction-btn').forEach(b => {
+            const r = b.getAttribute('data-r');
+            const c = parseInt(b.querySelector('.reaction-count').innerText);
+            if (c > maxC) { maxC = c; topReact = r; }
+        });
+
+        let badge = wrapper.querySelector('.top-reaction-badge');
+        if (!badge && topReact) {
+            badge = document.createElement('div');
+            badge.className = 'top-reaction-badge';
+            wrapper.insertBefore(badge, wrapper.querySelector('img') || wrapper.firstChild);
+        }
+        if (badge && badge.innerText !== topReact) {
+            badge.innerText = topReact;
+            badge.style.animation = 'none';
+            badge.offsetHeight; // Перезапуск анимации
+            badge.style.animation = 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+        }
+
+        // 3. Отправляем в очередь на сервер (Debounce)
+        const key = `${battleId}|${participant}|${reaction}`;
+        reactionQueue[key] = (reactionQueue[key] || 0) + 1;
+
+        if (!reactionTimer) {
+            reactionTimer = setTimeout(flushReactions, 2000); // Сливаем пачку раз в 2 секунды
+        }
+    }
+
+    function flushReactions() {
+        const items = { ...reactionQueue };
+        reactionQueue = {};
+        reactionTimer = null;
+
+        if (Object.keys(items).length === 0) return;
+
+        fetch('/api/react-bulk', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ battleId, participant, reaction })
+            body: JSON.stringify({ reactions: items })
         }).catch(e => console.error(e));
     }
     
@@ -651,7 +750,7 @@
     setInterval(updateTimers, 1000);
 
     loadData();
-    setInterval(loadData, 10000); // Автообновление каждые 10 сек (на случай долгого открытого окна)
+    setupStream(); // Запуск Realtime-стрима вместо setInterval
     // Учет просмотра страницы
     if (!sessionStorage.getItem('tracked_index')) {
         fetch('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ page: 'index' }) })

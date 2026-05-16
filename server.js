@@ -5,10 +5,33 @@ const crypto = require('crypto'); // Добавляем криптографию
 
 const app = express();
 const authTokens = new Set(); // Хранилище активных сессий (токенов)
+const sseClients = new Set(); // Хранилище подключенных клиентов для Realtime
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static('public'));
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
+// --- Server-Sent Events (SSE) Стрим ---
+app.get('/api/stream', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+    
+    sseClients.add(res);
+    req.on('close', () => sseClients.delete(res));
+});
+
+// --- Подписка на Supabase Realtime ---
+// Бэкенд слушает изменения в БД и рассылает их всем подключенным пользователям
+supabase.channel('schema-db-changes')
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'app_state' }, (payload) => {
+        const newState = payload.new.data;
+        const dataStr = `data: ${JSON.stringify(newState)}\n\n`;
+        for (let client of sseClients) {
+            client.write(dataStr);
+        }
+    })
+    .subscribe();
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 // Получить текущее состояние
@@ -108,6 +131,38 @@ app.delete('/api/mail', async (req, res) => {
 });
 
 // --- РЕАКЦИИ ---
+// Оптимизированный эндпоинт для пачки реакций (Debounce)
+app.post('/api/react-bulk', async (req, res) => {
+    const { reactions } = req.body;
+    if (!reactions) return res.status(400).json({ error: 'Bad params' });
+
+    try {
+        const { data, error } = await supabase.from('app_state').select('data').eq('id', 1).single();
+        if (error) throw error;
+
+        let state = data.data;
+        if (!state.reactions) state.reactions = {};
+
+        let updated = false;
+        for (const key in reactions) {
+            const [battleId, participant, reaction] = key.split('|');
+            const count = reactions[key];
+
+            if (!state.reactions[battleId]) state.reactions[battleId] = { '1': {}, '2': {} };
+            if (!state.reactions[battleId][participant]) state.reactions[battleId][participant] = {};
+
+            state.reactions[battleId][participant][reaction] = (state.reactions[battleId][participant][reaction] || 0) + count;
+            updated = true;
+        }
+
+        if (updated) {
+            await supabase.from('app_state').update({ data: state }).eq('id', 1);
+        }
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 app.post('/api/react', async (req, res) => {
     const { battleId, participant, reaction } = req.body;
     if (!battleId || !participant || !reaction) return res.status(400).json({ error: 'Bad params' });

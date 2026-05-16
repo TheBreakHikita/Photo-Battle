@@ -573,7 +573,22 @@
     }
 
     loadData();
-    setInterval(loadData, 10000); // Автообновление
+    
+    // Подключаем Realtime
+    const evtSource = new EventSource('/api/stream');
+    evtSource.onmessage = function(e) {
+        try {
+            const state = JSON.parse(e.data);
+            const stateString = JSON.stringify(state);
+            if (stateString !== lastStateHash) {
+                lastStateHash = stateString;
+                localStorage.setItem('bracketCache', stateString);
+                appState = state;
+                renderBracket();
+            }
+        } catch(err) {}
+    };
+    evtSource.onerror = () => evtSource.close();
     // Учет просмотра страницы
     if (!sessionStorage.getItem('tracked_bracket')) {
         fetch('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ page: 'bracket' }) })
