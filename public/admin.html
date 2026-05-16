@@ -600,17 +600,22 @@
         const container = document.getElementById('battlesAdminContainer');
         container.innerHTML = '';
         appState.battles.forEach((b, index) => {
+            const statusWaiting = b.status === 'waiting' ? 'selected' : '';
             const statusActive = (!b.status || b.status === 'active') ? 'selected' : '';
             const statusFinished = b.status === 'finished' ? 'selected' : '';
             container.innerHTML += `
             <div class="admin-match" style="border-left: 4px solid #3b82f6;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <strong style="font-size: 1.1em;">Бой #${index + 1}</strong>
-                    <button onclick="removeBattle('${b.id}')" style="background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor:pointer;">Удалить бой</button>
+                    <div>
+                        <button onclick="resetBattleReactions('${b.id}')" style="background: #f59e0b; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor:pointer; margin-right: 10px;">Очистить реакции</button>
+                        <button onclick="removeBattle('${b.id}')" style="background: #ef4444; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor:pointer;">Удалить бой</button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>Статус боя:</label>
                     <select class="b-status">
+                        <option value="waiting" ${statusWaiting}>🟡 Ожидание начала</option>
                         <option value="active" ${statusActive}>🟢 Идет голосование</option>
                         <option value="finished" ${statusFinished}>🔴 Победитель выбран (Завершено)</option>
                     </select>
@@ -651,6 +656,15 @@
 
     function addBattle() { appState.battles.push({ id: 'b' + Date.now(), title: "Новый бой", photo1: "", photo2: "", link: "", status: "active", endTime: "", participant1: "", participant2: "", winner: "" }); renderBattles(); }
     function removeBattle(id) { appState.battles = appState.battles.filter(b => b.id !== id); renderBattles(); }
+    function resetBattleReactions(id) {
+        if(!confirm('Очистить все реакции для этого боя?')) return;
+        if(appState.reactions && appState.reactions[id]) {
+            delete appState.reactions[id];
+            alert('Реакции очищены! Обязательно нажмите "Сохранить изменения" внизу экрана.');
+        } else {
+            alert('Реакций пока нет.');
+        }
+    }
     function saveBattlesToState() {
         const blocks = document.querySelectorAll('#battlesAdminContainer .admin-match');
         appState.battles = Array.from(blocks).map((block, i) => ({
