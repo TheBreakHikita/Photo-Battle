@@ -6,7 +6,7 @@ const crypto = require('crypto'); // Добавляем криптографию
 const app = express();
 const authTokens = new Set(); // Хранилище активных сессий (токенов)
 const sseClients = new Set(); // Хранилище подключенных клиентов для Realtime
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '50mb' })); // Увеличиваем лимит для сохранения картинок
 app.use(express.static('public'));
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";

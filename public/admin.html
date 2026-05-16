@@ -67,6 +67,12 @@
         .participant-item input { margin-left: 10px; }
         .drag-handle { cursor: grab; font-size: 1.2em; padding: 0 10px 0 0; color: #94a3b8; }
         .drag-handle:active { cursor: grabbing; }
+        /* Фото участников */
+        .participant-content { display: flex; flex-direction: column; width: 100%; }
+        .participant-row { display: flex; align-items: center; width: 100%; }
+        .participant-photo-controls { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); width: 100%; }
+        .p-photo-preview { width: 50px; height: 50px; border-radius: 8px; object-fit: cover; background: #f1f5f9; display: flex; align-items: center; justify-content: center; font-size: 11px; text-align: center; color: #64748b; overflow: hidden; border: 1px solid var(--border); flex-shrink: 0; }
+        .p-photo-preview img { width: 100%; height: 100%; object-fit: cover; }
         
         /* Analytics */
         .analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }
@@ -422,12 +428,25 @@
             li.className = 'participant-item';
             li.dataset.id = p.id;
             li.innerHTML = `
-                <span class="drag-handle">↕️</span>
-                <span style="font-weight:bold; color:#94a3b8; width: 35px;">#${index+1}</span>
-                <input type="text" value="${p.emoji}" class="p-emoji" style="width: 60px; text-align: center;" placeholder="Смайл">
-                <input type="text" value="${p.name}" class="p-name" placeholder="Никнейм участника" style="flex: 1;">
-                <input type="text" value="${p.link || ''}" class="p-link" placeholder="Ссылка на профиль (опционально)" style="flex: 1;">
-                <button onclick="removeParticipant('${p.id}')" class="btn btn-danger" style="padding: 10px 15px; margin-left: 10px;">❌</button>
+                <div class="participant-content">
+                    <div class="participant-row">
+                        <span class="drag-handle">↕️</span>
+                        <span style="font-weight:bold; color:#94a3b8; width: 35px;">#${index+1}</span>
+                        <input type="text" value="${p.emoji}" class="p-emoji" style="width: 60px; text-align: center;" placeholder="Смайл">
+                        <input type="text" value="${p.name}" class="p-name" placeholder="Никнейм участника" style="flex: 1;">
+                        <input type="text" value="${p.link || ''}" class="p-link" placeholder="Ссылка на профиль (опционально)" style="flex: 1;">
+                        <button onclick="removeParticipant('${p.id}')" class="btn btn-danger" style="padding: 10px 15px; margin-left: 10px;">❌</button>
+                    </div>
+                    <div class="participant-photo-controls">
+                        <div class="p-photo-preview" id="preview-${p.id}">
+                            ${p.photoBase64 ? `<img src="${p.photoBase64}" onclick="viewFullPhoto('${p.id}')" style="cursor: pointer;" title="Нажмите, чтобы увеличить">` : 'Нет фото'}
+                        </div>
+                        <input type="file" id="file-${p.id}" accept="image/*" style="display: none;" onchange="handleParticipantPhotoUpload(event, '${p.id}')">
+                        <button class="btn btn-outline" style="padding: 5px 10px; font-size: 0.8em;" onclick="document.getElementById('file-${p.id}').click()">📁 Загрузить/Заменить</button>
+                        ${p.photoBase64 ? `<button class="btn btn-success" style="padding: 5px 10px; font-size: 0.8em;" onclick="downloadParticipantPhoto('${p.id}')">⬇️ Скачать</button>` : ''}
+                        ${p.photoBase64 ? `<button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.8em; background: transparent; color: var(--danger); border: 1px solid var(--danger);" onclick="removeParticipantPhoto('${p.id}')">🗑 Удалить фото</button>` : ''}
+                    </div>
+                </div>
             `;
             list.appendChild(li);
         });
@@ -437,7 +456,7 @@
     }
 
     function addParticipant() {
-        appState.participants.push({ id: 'p' + Date.now(), emoji: '👤', name: 'Новый участник', link: '' });
+        appState.participants.push({ id: 'p' + Date.now(), emoji: '👤', name: 'Новый участник', link: '', photoBase64: null });
         renderParticipants();
     }
 
@@ -449,12 +468,18 @@
 
     function updateParticipantsArray() {
         const items = document.querySelectorAll('.participant-item');
-        appState.participants = Array.from(items).map(item => ({
-            id: item.dataset.id,
-            emoji: item.querySelector('.p-emoji').value,
-            name: item.querySelector('.p-name').value,
-            link: item.querySelector('.p-link').value // Сохраняем ссылку
-        }));
+        appState.participants = Array.from(items).map(item => {
+            const id = item.dataset.id;
+            // Ищем существующего участника, чтобы не потерять его загруженную фотографию
+            const existing = appState.participants.find(p => p.id === id);
+            return {
+                id: id,
+                emoji: item.querySelector('.p-emoji').value,
+                name: item.querySelector('.p-name').value,
+                link: item.querySelector('.p-link').value,
+                photoBase64: existing ? existing.photoBase64 : null // Сохраняем фото
+            };
+        });
     }
 
     function shuffleParticipants() {
@@ -471,6 +496,87 @@
         
         // Перерисовываем список на экране с новым порядком
         renderParticipants();
+    }
+
+    // --- РАБОТА С ФОТОГРАФИЯМИ УЧАСТНИКОВ ---
+    function handleParticipantPhotoUpload(event, id) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // Обновляем данные с полей перед перерисовкой
+        updateParticipantsArray();
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                // Сжимаем изображение (Макс. ширина/высота 800px)
+                const canvas = document.createElement('canvas');
+                const MAX_SIZE = 800;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > height) {
+                    if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
+                } else {
+                    if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Конвертируем в Base64 (JPEG, качество 80%)
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+                const p = appState.participants.find(x => x.id === id);
+                if (p) {
+                    p.photoBase64 = dataUrl;
+                    renderParticipants(); // Перерисовываем список
+                }
+            }
+            img.src = e.target.result;
+        }
+        reader.readAsDataURL(file);
+    }
+
+    function viewFullPhoto(id) {
+        const p = appState.participants.find(x => x.id === id);
+        if (!p || !p.photoBase64) return;
+        
+        // Создаем простое всплывающее окно для просмотра
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; display:flex; justify-content:center; align-items:center; cursor:pointer;';
+        const img = document.createElement('img');
+        img.src = p.photoBase64;
+        img.style.cssText = 'max-width:90%; max-height:90%; border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.5);';
+        
+        overlay.appendChild(img);
+        overlay.onclick = () => document.body.removeChild(overlay);
+        document.body.appendChild(overlay);
+    }
+
+    function downloadParticipantPhoto(id) {
+        const p = appState.participants.find(x => x.id === id);
+        if (!p || !p.photoBase64) return;
+        
+        const a = document.createElement('a');
+        a.href = p.photoBase64;
+        a.download = `photo_${p.name.replace(/[^a-z0-9а-яё]/gi, '_') || 'participant'}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    function removeParticipantPhoto(id) {
+        if(!confirm('Точно удалить загруженную фотографию участника?')) return;
+        updateParticipantsArray(); // Сохраняем введенный текст
+        const p = appState.participants.find(x => x.id === id);
+        if (p) {
+            p.photoBase64 = null;
+            renderParticipants();
+        }
     }
 
     // --- АЛГОРИТМ ГЕНЕРАЦИИ СЕТКИ (НА ЛЮБОЕ КОЛ-ВО УЧАСТНИКОВ) ---
@@ -634,7 +740,12 @@
                         <select class="b-p1-id" style="margin-bottom: 10px;">
                             ${getParticipantOptions(b.participant1)}
                         </select>
-                        <label>Фото 1 (ссылка):</label><input type="text" class="b-p1" value="${b.photo1}">
+                        <label>Источник фото 1:</label>
+                        <select class="b-p1-source" style="margin-bottom: 10px;">
+                            <option value="link" ${b.p1PhotoSource !== 'upload' ? 'selected' : ''}>По ссылке</option>
+                            <option value="upload" ${b.p1PhotoSource === 'upload' ? 'selected' : ''}>Из загруженных участнику</option>
+                        </select>
+                        <label>Фото 1 (ссылка, если выбрано выше):</label><input type="text" class="b-p1" value="${b.photo1}">
                     </div>
                     <label style="margin-top: 10px; color: #3b82f6;">Процент голосов (%):</label>
                         <input type="number" step="0.1" class="b-pct1" value="${b.pct1 || ''}" placeholder="Например: 65.5">
@@ -643,7 +754,12 @@
                         <select class="b-p2-id" style="margin-bottom: 10px;">
                             ${getParticipantOptions(b.participant2)}
                         </select>
-                        <label>Фото 2 (ссылка):</label><input type="text" class="b-p2" value="${b.photo2}">
+                        <label>Источник фото 2:</label>
+                        <select class="b-p2-source" style="margin-bottom: 10px;">
+                            <option value="link" ${b.p2PhotoSource !== 'upload' ? 'selected' : ''}>По ссылке</option>
+                            <option value="upload" ${b.p2PhotoSource === 'upload' ? 'selected' : ''}>Из загруженных участнику</option>
+                        </select>
+                        <label>Фото 2 (ссылка, если выбрано выше):</label><input type="text" class="b-p2" value="${b.photo2}">
                     </div>
                     <label style="margin-top: 10px; color: #3b82f6;">Процент голосов (%):</label>
                         <input type="number" step="0.1" class="b-pct2" value="${b.pct2 || ''}" placeholder="Например: 34.5">
@@ -663,7 +779,7 @@
         });
     }
 
-    function addBattle() { appState.battles.push({ id: 'b' + Date.now(), title: "Новый бой", photo1: "", photo2: "", link: "", status: "active", endTime: "", participant1: "", participant2: "", winner: "", totalVotes: "", pct1: "", pct2: "", votesUpdatedAt: "" }); renderBattles(); }
+    function addBattle() { appState.battles.push({ id: 'b' + Date.now(), title: "Новый бой", photo1: "", photo2: "", p1PhotoSource: "link", p2PhotoSource: "link", link: "", status: "active", endTime: "", participant1: "", participant2: "", winner: "", totalVotes: "", pct1: "", pct2: "", votesUpdatedAt: "" }); renderBattles(); }
     function removeBattle(id) { appState.battles = appState.battles.filter(b => b.id !== id); renderBattles(); }
     function resetBattleReactions(id) {
         if(!confirm('Очистить все реакции для этого боя?')) return;
@@ -694,6 +810,8 @@
                 endTime: block.querySelector('.b-endtime').value,
                 participant1: block.querySelector('.b-p1-id').value,
                 participant2: block.querySelector('.b-p2-id').value,
+                p1PhotoSource: block.querySelector('.b-p1-source') ? block.querySelector('.b-p1-source').value : 'link',
+                p2PhotoSource: block.querySelector('.b-p2-source') ? block.querySelector('.b-p2-source').value : 'link',
                 winner: block.querySelector('.b-winner').value,
                 photo1: block.querySelector('.b-p1').value, 
                 photo2: block.querySelector('.b-p2').value, 

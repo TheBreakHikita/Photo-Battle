@@ -522,12 +522,30 @@
                 const w1Class = isW1 ? 'winner' : '';
                 const w2Class = isW2 ? 'winner' : '';
 
-                // Красивая SVG-заглушка с вопросительным знаком для пустых фото
+                // Красивая SVG-заглушка с вопросительным знаком для пустых фото или режима ожидания
                 const defaultImg = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='400' viewBox='0 0 300 400'%3E%3Crect width='300' height='400' fill='%23334155'/%3E%3Ctext x='50%25' y='50%25' font-family='sans-serif' font-size='100' font-weight='bold' fill='%2394a3b8' text-anchor='middle' dominant-baseline='middle'%3E?%3C/text%3E%3C/svg%3E";
                 
-                // Проверяем: если фото есть - используем его, если пусто - ставим заглушку
-                const img1 = battle.photo1 && battle.photo1.trim() !== '' ? battle.photo1 : defaultImg;
-                const img2 = battle.photo2 && battle.photo2.trim() !== '' ? battle.photo2 : defaultImg;
+                let img1 = defaultImg;
+                let img2 = defaultImg;
+
+                // Если бой НЕ в ожидании, загружаем реальные фото
+                if (!isWaiting) {
+                    // Участник 1 (Слева)
+                    if (battle.p1PhotoSource === 'upload') {
+                        const p1Obj = state.participants.find(p => p.id === battle.participant1);
+                        if (p1Obj && p1Obj.photoBase64) img1 = p1Obj.photoBase64;
+                    } else {
+                        if (battle.photo1 && battle.photo1.trim() !== '') img1 = battle.photo1;
+                    }
+
+                    // Участник 2 (Справа)
+                    if (battle.p2PhotoSource === 'upload') {
+                        const p2Obj = state.participants.find(p => p.id === battle.participant2);
+                        if (p2Obj && p2Obj.photoBase64) img2 = p2Obj.photoBase64;
+                    } else {
+                        if (battle.photo2 && battle.photo2.trim() !== '') img2 = battle.photo2;
+                    }
+                }
 
                 const rState = state.reactions && state.reactions[battle.id] ? state.reactions[battle.id] : { '1': {}, '2': {} };
                 
