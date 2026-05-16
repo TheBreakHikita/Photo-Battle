@@ -209,11 +209,18 @@ app.post('/api/state', async (req, res) => {
         if (currentState.data.analytics) newState.analytics = currentState.data.analytics;
         if (currentState.data.reactions) {
             if (newState.reactions && Object.keys(newState.reactions).length === 0) {
-                // Админ сбросил турнир (очищаем реакции)
+                // Админ сбросил турнир (очищаем реакции полностью)
                 newState.reactions = {};
             } else {
-                // Иначе сохраняем накопленные реакции пользователей
-                newState.reactions = currentState.data.reactions;
+                // Оставляем только те реакции из базы, ключи которых всё ещё присутствуют в newState от админа.
+                // Это позволяет админу удалять реакции конкретного боя, не теряя свежие клики в остальных боях.
+                const mergedReactions = {};
+                for (let key in currentState.data.reactions) {
+                    if (newState.reactions[key]) {
+                        mergedReactions[key] = currentState.data.reactions[key];
+                    }
+                }
+                newState.reactions = mergedReactions;
             }
         }
     }

@@ -321,39 +321,50 @@
     }
 
     function updateReactionsDOM(reactions) {
-        if (!reactions) return;
-        for (const battleId in reactions) {
-            for (const part of ['1', '2']) {
-                const counts = reactions[battleId][part] || {};
-                let maxCount = 0;
-                let topReact = null;
+        // 1. Обновляем все кнопки реакций, даже если реакции обнулены админом
+        document.querySelectorAll('.reaction-btn').forEach(btn => {
+            const bId = btn.getAttribute('data-b');
+            const pId = btn.getAttribute('data-p');
+            const r = btn.getAttribute('data-r');
+            let count = 0;
+            if (reactions && reactions[bId] && reactions[bId][pId] && reactions[bId][pId][r]) {
+                count = reactions[bId][pId][r];
+            }
+            btn.querySelector('.reaction-count').innerText = count;
+        });
 
-                // Обновляем цифры
-                for (const r in counts) {
-                    const c = counts[r];
+        // 2. Обновляем бейджи главных реакций
+        document.querySelectorAll('.photo-wrapper').forEach(wrapper => {
+            const bId = wrapper.getAttribute('data-b');
+            const pId = wrapper.getAttribute('data-p');
+            
+            let maxCount = 0;
+            let topReact = null;
+            
+            if (reactions && reactions[bId] && reactions[bId][pId]) {
+                const counts = reactions[bId][pId];
+                for (const [r, c] of Object.entries(counts)) {
                     if (c > maxCount) { maxCount = c; topReact = r; }
-                    const btnCount = document.querySelector(`.reaction-btn[data-b="${battleId}"][data-p="${part}"][data-r="${r}"] .reaction-count`);
-                    if (btnCount) btnCount.innerText = c;
-                }
-
-                // Мгновенно обновляем корону-бейджик главной реакции
-                const wrapper = document.querySelector(`.photo-wrapper[data-b="${battleId}"][data-p="${part}"]`);
-                if (wrapper) {
-                    let badge = wrapper.querySelector('.top-reaction-badge');
-                    if (!badge && topReact) {
-                        badge = document.createElement('div');
-                        badge.className = 'top-reaction-badge';
-                        wrapper.insertBefore(badge, wrapper.querySelector('img') || wrapper.firstChild);
-                    }
-                    if (badge && badge.innerText !== topReact) {
-                        badge.innerText = topReact;
-                        badge.style.animation = 'none';
-                        badge.offsetHeight; // Сброс анимации
-                        badge.style.animation = 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
-                    }
                 }
             }
-        }
+
+            let badge = wrapper.querySelector('.top-reaction-badge');
+            if (maxCount === 0) {
+                if (badge) badge.remove();
+            } else if (topReact) {
+                if (!badge) {
+                    badge = document.createElement('div');
+                    badge.className = 'top-reaction-badge';
+                    wrapper.insertBefore(badge, wrapper.querySelector('img') || wrapper.firstChild);
+                }
+                if (badge.innerText !== topReact) {
+                    badge.innerText = topReact;
+                    badge.style.animation = 'none';
+                    badge.offsetHeight; // Перезапуск анимации
+                    badge.style.animation = 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+                }
+            }
+        });
     }
 
     // Мгновенная загрузка из кэша
@@ -422,16 +433,27 @@
         battlesContainer.innerHTML = '';
         if (state.battles && state.battles.length > 0) {
             state.battles.forEach(battle => {
+                const isWaiting = battle.status === 'waiting';
+                const isFinished = battle.status === 'finished';
                 const isActive = !battle.status || battle.status === 'active';
-                const badgeHtml = isActive 
-                    ? `<div class="b-badge active">🔥 ИДЕТ ГОЛОСОВАНИЕ</div>`
-                    : `<div class="b-badge finished">🏁 ПОБЕДИТЕЛЬ ВЫБРАН</div>`;
-                // Изменяем текст кнопки в зависимости от статуса (как просили в ТЗ)
-                const btnText = isActive ? 'Перейти к посту и проголосовать' : 'Перейти к посту';
-                const btnClass = isActive ? 'btn' : 'btn finished';
+                
+                let badgeHtml = '';
+                if (isWaiting) {
+                    badgeHtml = `<div class="b-badge" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4);">🟡 ОЖИДАНИЕ НАЧАЛА</div>`;
+                } else if (isActive) {
+                    badgeHtml = `<div class="b-badge active">🔥 ИДЕТ ГОЛОСОВАНИЕ</div>`;
+                } else {
+                    badgeHtml = `<div class="b-badge finished">🏁 ПОБЕДИТЕЛЬ ВЫБРАН</div>`;
+                }
 
-                const timerHtml = (isActive && battle.endTime) 
-                    ? `<div class="battle-timer" data-endtime="${battle.endTime}">⏳ Вычисляем время...</div>` 
+                let btnText = 'Перейти к посту';
+                if (isActive) btnText = 'Перейти к посту и проголосовать';
+                else if (isWaiting) btnText = 'Перейти к посту (Скоро начало)';
+                
+                const btnClass = isFinished ? 'btn finished' : 'btn';
+
+                const timerHtml = ((isActive || isWaiting) && battle.endTime) 
+                    ? `<div class="battle-timer" data-endtime="${battle.endTime}" data-status="${battle.status || 'active'}">⏳ Вычисляем время...</div>` 
                     : '';
 
                 // HTML профилей под фото
@@ -467,7 +489,7 @@
                 };
 
                 const getReactHtml = (part) => {
-                    if (!isActive) return ''; // Если бой завершен, скрываем кнопки реакций
+                    if (isFinished) return ''; // Если бой завершен, скрываем кнопки (для ожидания и активного оставляем)
                     const counts = rState[part] || {};
                     const reacts = ['🔥', '😎', '💀'];
                     return `<div class="reactions-container">` + reacts.map(r => {
@@ -694,6 +716,7 @@
         document.querySelectorAll('.battle-timer').forEach(el => {
             const endTimeStr = el.getAttribute('data-endtime');
             if (!endTimeStr) return;
+            const status = el.getAttribute('data-status') || 'active';
 
             const end = new Date(endTimeStr).getTime();
             const now = new Date().getTime();
@@ -710,7 +733,7 @@
             const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             const s = Math.floor((diff % (1000 * 60)) / 1000);
 
-            let timeStr = '⏳ До конца: ';
+            let timeStr = status === 'waiting' ? '⏳ До начала: ' : '⏳ До конца: ';
             if (d > 0) timeStr += `${d}д `;
             timeStr += `${h.toString().padStart(2, '0')}ч ${m.toString().padStart(2, '0')}м ${s.toString().padStart(2, '0')}с`;
             
