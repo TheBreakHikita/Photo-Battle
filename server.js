@@ -10,6 +10,7 @@ app.use(express.json({ limit: '5mb' }));
 app.use(express.static('public'));
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin";
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 // --- Server-Sent Events (SSE) Стрим ---
 app.get('/api/stream', (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
@@ -32,7 +33,6 @@ supabase.channel('schema-db-changes')
         }
     })
     .subscribe();
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 // Получить текущее состояние
 app.get('/api/state', async (req, res) => {
