@@ -623,6 +623,11 @@
                 <div class="form-group"><label>Заголовок:</label><input type="text" class="b-title" value="${b.title}"></div>
                 <div class="form-group"><label>Таймер (до какого времени):</label><input type="datetime-local" class="b-endtime" value="${b.endTime || ''}" style="cursor: pointer;"></div>
                 
+                <div class="form-group" style="background: rgba(59, 130, 246, 0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.3);">
+                    <label>Общее количество голосов в опросе (для расчета):</label>
+                    <input type="number" class="b-total-votes" value="${b.totalVotes || ''}" placeholder="Например: 5430">
+                </div>
+
                 <div style="display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap;">
                     <div style="flex: 1; min-width: 250px; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #ccc;">
                         <label>Участник 1 (под левым фото):</label>
@@ -631,8 +636,8 @@
                         </select>
                         <label>Фото 1 (ссылка):</label><input type="text" class="b-p1" value="${b.photo1}">
                     </div>
-                    <label style="margin-top: 10px; color: #3b82f6;">Голоса / Проценты:</label>
-                        <input type="number" class="b-votes1" value="${b.votes1 || ''}" placeholder="Например: 1540">
+                    <label style="margin-top: 10px; color: #3b82f6;">Процент голосов (%):</label>
+                        <input type="number" step="0.1" class="b-pct1" value="${b.pct1 || ''}" placeholder="Например: 65.5">
                     <div style="flex: 1; min-width: 250px; background: #fff; padding: 10px; border-radius: 8px; border: 1px solid #ccc;">
                         <label>Участник 2 (под правым фото):</label>
                         <select class="b-p2-id" style="margin-bottom: 10px;">
@@ -640,8 +645,8 @@
                         </select>
                         <label>Фото 2 (ссылка):</label><input type="text" class="b-p2" value="${b.photo2}">
                     </div>
-                    <label style="margin-top: 10px; color: #ef4444;">Голоса / Проценты:</label>
-                        <input type="number" class="b-votes2" value="${b.votes2 || ''}" placeholder="Например: 890">
+                    <label style="margin-top: 10px; color: #3b82f6;">Процент голосов (%):</label>
+                        <input type="number" step="0.1" class="b-pct2" value="${b.pct2 || ''}" placeholder="Например: 34.5">
                 </div>
 
                 <div class="form-group" style="background: rgba(34, 197, 94, 0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3);">
@@ -658,7 +663,7 @@
         });
     }
 
-    function addBattle() { appState.battles.push({ id: 'b' + Date.now(), title: "Новый бой", photo1: "", photo2: "", link: "", status: "active", endTime: "", participant1: "", participant2: "", winner: "", votes1: "", votes2: "" }); renderBattles(); }
+    function addBattle() { appState.battles.push({ id: 'b' + Date.now(), title: "Новый бой", photo1: "", photo2: "", link: "", status: "active", endTime: "", participant1: "", participant2: "", winner: "", totalVotes: "", pct1: "", pct2: "", votesUpdatedAt: "" }); renderBattles(); }
     function removeBattle(id) { appState.battles = appState.battles.filter(b => b.id !== id); renderBattles(); }
     function resetBattleReactions(id) {
         if(!confirm('Очистить все реакции для этого боя?')) return;
@@ -671,20 +676,34 @@
     }
     function saveBattlesToState() {
         const blocks = document.querySelectorAll('#battlesAdminContainer .admin-match');
-        appState.battles = Array.from(blocks).map((block, i) => ({
-            id: appState.battles[i].id, 
-            status: block.querySelector('.b-status').value,
-            title: block.querySelector('.b-title').value,
-            endTime: block.querySelector('.b-endtime').value,
-            participant1: block.querySelector('.b-p1-id').value,
-            participant2: block.querySelector('.b-p2-id').value,
-            winner: block.querySelector('.b-winner').value,
-            photo1: block.querySelector('.b-p1').value, 
-            photo2: block.querySelector('.b-p2').value, 
-            link: block.querySelector('.b-link').value,
-            votes1: block.querySelector('.b-votes1').value,
-            votes2: block.querySelector('.b-votes2').value
-        }));
+        appState.battles = Array.from(blocks).map((block, i) => {
+            const newTotal = block.querySelector('.b-total-votes').value;
+            const newPct1 = block.querySelector('.b-pct1').value;
+            const newPct2 = block.querySelector('.b-pct2').value;
+            
+            // Проверяем, изменились ли голоса, чтобы обновить время "Последнее обновление"
+            let updatedAt = appState.battles[i].votesUpdatedAt || '';
+            if (appState.battles[i].totalVotes !== newTotal || appState.battles[i].pct1 !== newPct1 || appState.battles[i].pct2 !== newPct2) {
+                updatedAt = new Date().toISOString();
+            }
+
+            return {
+                id: appState.battles[i].id, 
+                status: block.querySelector('.b-status').value,
+                title: block.querySelector('.b-title').value,
+                endTime: block.querySelector('.b-endtime').value,
+                participant1: block.querySelector('.b-p1-id').value,
+                participant2: block.querySelector('.b-p2-id').value,
+                winner: block.querySelector('.b-winner').value,
+                photo1: block.querySelector('.b-p1').value, 
+                photo2: block.querySelector('.b-p2').value, 
+                link: block.querySelector('.b-link').value,
+                totalVotes: newTotal,
+                pct1: newPct1,
+                pct2: newPct2,
+                votesUpdatedAt: updatedAt
+            };
+        });
     }
 
     function renderOrganizers() {
