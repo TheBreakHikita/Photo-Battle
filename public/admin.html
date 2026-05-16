@@ -357,6 +357,7 @@
         if(!appState.battles) appState.battles = []; 
         if(!appState.organizers) appState.organizers = [];
         if(!appState.matches) appState.matches = {};
+        if(!appState.reactions) appState.reactions = {};
         if(!appState.eventInfo) {
             appState.eventInfo = { blocks: [], buttonText: "Участвовать", buttonLink: "" };
         }
@@ -744,6 +745,7 @@
         appState.participants = [];
         appState.matches = {};
         appState.bracketMeta = null;
+        appState.reactions = {}; // Сброс реакций
         renderAdmin();
     }
 

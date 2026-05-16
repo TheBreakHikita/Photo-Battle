@@ -107,6 +107,29 @@ app.delete('/api/mail', async (req, res) => {
     res.json({ success: true });
 });
 
+// --- РЕАКЦИИ ---
+app.post('/api/react', async (req, res) => {
+    const { battleId, participant, reaction } = req.body;
+    if (!battleId || !participant || !reaction) return res.status(400).json({ error: 'Bad params' });
+
+    try {
+        const { data, error } = await supabase.from('app_state').select('data').eq('id', 1).single();
+        if (error) throw error;
+
+        let state = data.data;
+        if (!state.reactions) state.reactions = {};
+        if (!state.reactions[battleId]) state.reactions[battleId] = { '1': {}, '2': {} };
+        if (!state.reactions[battleId][participant]) state.reactions[battleId][participant] = {};
+        
+        state.reactions[battleId][participant][reaction] = (state.reactions[battleId][participant][reaction] || 0) + 1;
+
+        await supabase.from('app_state').update({ data: state }).eq('id', 1);
+        res.json({ success: true, count: state.reactions[battleId][participant][reaction] });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Авторизация админа
 app.post('/api/login', (req, res) => {
     if (req.body.password === ADMIN_PASSWORD) {
@@ -127,8 +150,17 @@ app.post('/api/state', async (req, res) => {
     
     // Подтягиваем актуальную статистику из базы, чтобы админ случайно не перезаписал (не обнулил) её старыми данными
     const { data: currentState } = await supabase.from('app_state').select('data').eq('id', 1).single();
-    if (currentState && currentState.data && currentState.data.analytics) {
-        newState.analytics = currentState.data.analytics;
+    if (currentState && currentState.data) {
+        if (currentState.data.analytics) newState.analytics = currentState.data.analytics;
+        if (currentState.data.reactions) {
+            if (newState.reactions && Object.keys(newState.reactions).length === 0) {
+                // Админ сбросил турнир (очищаем реакции)
+                newState.reactions = {};
+            } else {
+                // Иначе сохраняем накопленные реакции пользователей
+                newState.reactions = currentState.data.reactions;
+            }
+        }
     }
 
     const { error } = await supabase.from('app_state').update({ data: newState }).eq('id', 1);

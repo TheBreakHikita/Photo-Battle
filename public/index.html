@@ -113,6 +113,28 @@
         .modal-form input:focus, .modal-form textarea:focus { border-color: var(--accent); outline: none; }
         .captcha-box { display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 8px; }
         .captcha-text { font-weight: bold; font-size: 1.2em; color: var(--winner); letter-spacing: 2px; }
+        /* Реакции */
+        .reactions-container {
+            display: flex; justify-content: center; gap: 8px; margin-top: 15px; flex-wrap: wrap;
+        }
+        .reaction-btn {
+            background: rgba(30, 41, 59, 0.8); border: 1px solid #334155; border-radius: 20px;
+            padding: 6px 12px; font-size: 1.1em; cursor: pointer; display: flex; align-items: center; gap: 6px;
+            transition: all 0.2s ease; color: var(--text); user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+        .reaction-btn:active { transform: scale(0.9); }
+        .reaction-btn.reacted { background: rgba(59, 130, 246, 0.2); border-color: var(--accent); color: var(--accent); }
+        .reaction-count { font-size: 0.9em; font-weight: bold; }
+        
+        .floating-emoji {
+            position: fixed; pointer-events: none; font-size: 2.5rem; z-index: 9999;
+            animation: floatUpEmoji 1s ease-out forwards;
+        }
+        @keyframes floatUpEmoji {
+            0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -150px) scale(1.5); }
+        }
+
         /* Empty State (Заглушка) */
         .empty-state h2 { font-size: 2.5em; line-height: 1.3; margin-bottom: 20px; color: var(--text); }
         .empty-state .btn-news { background: #f59e0b; box-shadow: 0 10px 20px rgba(245, 158, 11, 0.3); padding: 18px 40px; font-size: 1.2em; display: inline-block; margin-top: 15px; }
@@ -336,6 +358,17 @@
                 const img1 = battle.photo1 && battle.photo1.trim() !== '' ? battle.photo1 : defaultImg;
                 const img2 = battle.photo2 && battle.photo2.trim() !== '' ? battle.photo2 : defaultImg;
 
+                const rState = state.reactions && state.reactions[battle.id] ? state.reactions[battle.id] : { '1': {}, '2': {} };
+                const getReactHtml = (part) => {
+                    const counts = rState[part] || {};
+                    const reacts = ['🔥', '😎', '💀'];
+                    return `<div class="reactions-container">` + reacts.map(r => {
+                        const count = counts[r] || 0;
+                        const reacted = localStorage.getItem(`react_${battle.id}_${part}_${r}`) ? 'reacted' : '';
+                        return `<button class="reaction-btn ${reacted}" onclick="sendReaction(event, '${battle.id}', '${part}', '${r}')">${r} <span class="reaction-count">${count}</span></button>`;
+                    }).join('') + `</div>`;
+                };
+
                 battlesContainer.innerHTML += `
                 <section class="battle-section">
                     <h2>${battle.title}</h2>
@@ -346,12 +379,14 @@
                             ${w1Crown}
                             <img src="${img1}" alt="Участник 1">
                             ${p1Html}
+                            ${getReactHtml('1')}
                         </div>
                         <div class="vs">VS</div>
                         <div class="photo-wrapper ${w2Class}">
                             ${w2Crown}
                             <img src="${img2}" alt="Участник 2">
                             ${p2Html}
+                            ${getReactHtml('2')}
                         </div>
                     </div>
                     <a href="${battle.link}" class="${btnClass}" target="_blank">${btnText}</a>
@@ -453,6 +488,48 @@
         }
     }
 
+    function sendReaction(event, battleId, participant, reaction) {
+        const btn = event.currentTarget;
+        
+        // Анимация вылетающего смайлика (даже если пользователь уже нажимал)
+        const emoji = document.createElement('div');
+        emoji.className = 'floating-emoji';
+        emoji.innerText = reaction;
+        
+        // Получаем точные координаты клика/касания
+        let clientX = event.clientX;
+        let clientY = event.clientY;
+        if (event.touches && event.touches.length > 0) {
+            clientX = event.touches[0].clientX;
+            clientY = event.touches[0].clientY;
+        } else if (clientX === undefined) {
+            const rect = btn.getBoundingClientRect();
+            clientX = rect.left + rect.width / 2;
+            clientY = rect.top + rect.height / 2;
+        }
+
+        emoji.style.left = clientX + 'px';
+        emoji.style.top = clientY + 'px';
+        document.body.appendChild(emoji);
+        setTimeout(() => emoji.remove(), 1000);
+
+        // Ограничение: 1 голос на каждый тип реакции под одним фото
+        const storageKey = `react_${battleId}_${participant}_${reaction}`;
+        if (localStorage.getItem(storageKey)) return;
+
+        localStorage.setItem(storageKey, 'true');
+        btn.classList.add('reacted');
+        
+        const countSpan = btn.querySelector('.reaction-count');
+        countSpan.innerText = parseInt(countSpan.innerText) + 1;
+
+        fetch('/api/react', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ battleId, participant, reaction })
+        }).catch(e => console.error(e));
+    }
+    
     // Функция обновления таймеров
     function updateTimers() {
         // 1. Таймеры для активных боев
