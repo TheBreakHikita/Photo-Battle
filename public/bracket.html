@@ -70,6 +70,18 @@
         /* Стиль для подсказки */
         .hint-text { display: inline-block; background: rgba(59, 130, 246, 0.1); color: var(--accent); padding: 10px 20px; border-radius: 20px; font-size: 0.9em; margin-bottom: 30px; border: 1px solid rgba(59, 130, 246, 0.3); }
         .player.winner { border-left: 4px solid var(--winner); font-weight: bold; background: rgba(34, 197, 94, 0.1); animation: winnerHighlight 1s ease-out; }
+        /* Специальный стиль для победителя финала турнира (золотое свечение) */
+        .player.tournament-winner {
+            border-left: 4px solid #fbbf24 !important;
+            font-weight: bold;
+            background: rgba(251, 191, 36, 0.2) !important;
+            animation: tournamentWinnerPulse 1.5s infinite alternate !important;
+            z-index: 10;
+        }
+        @keyframes tournamentWinnerPulse {
+            0% { box-shadow: inset 0 0 10px rgba(251, 191, 36, 0.2), 0 0 15px rgba(251, 191, 36, 0.3); border-color: #f59e0b; }
+            100% { box-shadow: inset 0 0 20px rgba(251, 191, 36, 0.5), 0 0 35px rgba(251, 191, 36, 0.8); border-color: #fbbf24; }
+        }
         
         /* Кнопка профиля */
         .profile-btn { 
@@ -142,6 +154,9 @@
 </head>
 <body>
 
+<!-- Холст для конфетти, жестко закрепленный на весь экран (решает проблему скролла на мобильных) -->
+<canvas id="confettiCanvas" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; pointer-events: none;"></canvas>
+
 <a href="/" class="back-btn">⬅ Назад к батлам</a>
 <h1>Турнирная сетка</h1>
 
@@ -181,25 +196,27 @@
         // Если салют уже идет или библиотека не загрузилась - ничего не делаем
         if (confettiInterval || typeof confetti === 'undefined') return;
         
+        // Подключаем конфетти к нашему фиксированному холсту
+        const myCanvas = document.getElementById('confettiCanvas');
+        const myConfetti = confetti.create(myCanvas, { resize: true, useWorker: true });
+
         // Запускаем залпы каждые 300мс
         confettiInterval = setInterval(() => {
             // Залп слева
-            confetti({
+            myConfetti({
                 particleCount: 5,
                 angle: 60,
                 spread: 55,
                 origin: { x: 0, y: 0.8 },
-                colors: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'],
-                zIndex: 9999
+                colors: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6']
             });
             // Залп справа
-            confetti({
+            myConfetti({
                 particleCount: 5,
                 angle: 120,
                 spread: 55,
                 origin: { x: 1, y: 0.8 },
-                colors: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'],
-                zIndex: 9999
+                colors: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6']
             });
         }, 300);
     }
@@ -289,8 +306,12 @@
         if(!matchData) return '';
         const p1 = getPlayerContent(matchData.p1);
         const p2 = getPlayerContent(matchData.p2);
-        const w1 = matchData.winner === matchData.p1 && matchData.p1 ? 'winner' : '';
-        const w2 = matchData.winner === matchData.p2 && matchData.p2 ? 'winner' : '';
+        
+        // Если это финальный бой, даем победителю особенный класс
+        const winClass = isFinal ? 'winner tournament-winner' : 'winner';
+        
+        const w1 = matchData.winner === matchData.p1 && matchData.p1 ? winClass : '';
+        const w2 = matchData.winner === matchData.p2 && matchData.p2 ? winClass : '';
         
         // Добавляем случайную задержку для эффекта "волны" при первичной загрузке
         const delay = (Math.random() * 0.2).toFixed(2);

@@ -571,7 +571,8 @@
 
                 // Генерация HTML для падающих смайлов (псевдорандомные позиции)
                 const getFallingHtml = (emoji) => {
-                    if (!emoji) return '';
+                    // Отключаем падающие смайлики, если бой завершен
+                    if (!emoji || isFinished) return '';
                     let html = '<div class="falling-container">';
                     const poses = [10, 30, 50, 70, 85, 20];
                     const delays = [0, 1.5, 0.7, 2.2, 1.1, 2.8];
