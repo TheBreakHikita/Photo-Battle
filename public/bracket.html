@@ -154,8 +154,8 @@
 </head>
 <body>
 
-<!-- Холст для конфетти, жестко закрепленный на весь экран (решает проблему скролла на мобильных) -->
-<canvas id="confettiCanvas" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; pointer-events: none;"></canvas>
+<!-- Холст для конфетти, жестко закрепленный на весь экран (оптимизировано для мобильных) -->
+<canvas id="confettiCanvas" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 99999; pointer-events: none; transform: translateZ(0);"></canvas>
 
 <a href="/" class="back-btn">⬅ Назад к батлам</a>
 <h1>Турнирная сетка</h1>
@@ -191,18 +191,20 @@
     let lastStateHash = "";
     // Загружаем сохраненный режим отображения. Для мобилок по умолчанию ставим "list"
     let confettiInterval = null;
+    let myConfetti = null; // Выносим инстанс в глобальную область, чтобы не перегружать память при смене режимов
 
     function startConfetti() {
-        // Если салют уже идет или библиотека не загрузилась - ничего не делаем
         if (confettiInterval || typeof confetti === 'undefined') return;
         
-        // Подключаем конфетти к нашему фиксированному холсту
         const myCanvas = document.getElementById('confettiCanvas');
-        const myConfetti = confetti.create(myCanvas, { resize: true, useWorker: true });
+        if (!myConfetti) {
+            // Отключаем useWorker, так как на телефонах в режимах Сетка/Линия 
+            // фоновый поток может падать из-за сильной нагрузки от SVG линий и теней
+            myConfetti = confetti.create(myCanvas, { resize: true, useWorker: false });
+        }
 
         // Запускаем залпы каждые 300мс
         confettiInterval = setInterval(() => {
-            // Залп слева
             myConfetti({
                 particleCount: 5,
                 angle: 60,
@@ -210,7 +212,6 @@
                 origin: { x: 0, y: 0.8 },
                 colors: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6']
             });
-            // Залп справа
             myConfetti({
                 particleCount: 5,
                 angle: 120,
